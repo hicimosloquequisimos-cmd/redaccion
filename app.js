@@ -827,7 +827,8 @@
       if (word) { datos.niveles = []; datos.anotaciones = []; datos.subidaRubrica = E.subidas.rubrica; if (E.subidas.correccion) datos.subidaCorreccion = E.subidas.correccion; }
       else {
         datos.niveles = E.niveles; datos.anotaciones = E.anotaciones;
-        datos.rubricaDocx = Docx.aBase64(await Docx.llenarRubrica(await plantillaRubrica(E.a.rubrica), { titulo: E.env.titulo, codigo: E.env.id, fecha: new Date().toLocaleDateString('es-CO'), evaluador: E.evaluador, enlace: E.enlace, niveles: E.niveles, puntaje, dictamen, observaciones: E.observaciones }));
+        // Copia que se le puede enviar a la autora: sin el nombre del evaluador (doble ciego)
+        datos.rubricaDocx = Docx.aBase64(await Docx.llenarRubrica(await plantillaRubrica(E.a.rubrica), { titulo: E.env.titulo, codigo: E.env.id, fecha: new Date().toLocaleDateString('es-CO'), evaluador: 'Comité editorial · Hicimos lo que quisimos', enlace: E.enlace, niveles: E.niveles, puntaje, dictamen, observaciones: E.observaciones }));
         // Para el autor: correcciones sin el nombre del evaluador
         if (E.anotaciones.length && E.parrafos) datos.correccionDocx = Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Evaluación · Hicimos lo que quisimos', iniciales: 'HLQQ', titulo: `${E.env.id} · ${E.env.titulo}` }));
       }
@@ -853,7 +854,7 @@
       $$('[data-clave-u]').forEach(b => b.onclick = async () => {
         const u = S._us.find(x => x.id === b.dataset.claveU);
         if (!await confirmar(`¿Nueva contraseña para ${u.nombre}?`, 'Su contraseña actual deja de funcionar. Le daremos una temporal y, al entrar, tendrá que crear la suya.')) return;
-        try { const r = await api('restablecerClave', { id: u.id }); mostrarClave(u.nombre, r.claveTemporal); ruta(); } catch (er) { toast(er.message, true); }
+        try { const r = await api('restablecerClave', { id: u.id }); await ruta(); mostrarClave(u.nombre, r.claveTemporal); } catch (er) { toast(er.message, true); }
       });
     },
   };
@@ -871,7 +872,7 @@
       <div class="botones" style="margin-top:1rem"><button class="btn btn--rojo" data-si>${u ? 'Guardar' : 'Crear perfil'}</button><button class="btn" data-cerrar>Cancelar</button>${u && u.id !== S.usuario.id ? '<button class="btn btn--chico" data-borrar style="margin-left:auto">Borrar perfil</button>' : ''}</div>`, (m, cerrar) => {
       $('[data-si]', m).onclick = async () => {
         const d = { id: u && u.id, nombre: $('[name=nombre]', m).value.trim(), correo: $('[name=correo]', m).value.trim(), roles: $$('[name=rol]:checked', m).map(x => x.value), avisos: $('[name=avisos]', m).checked, activo: $('[name=activo]', m).checked };
-        try { const r2 = await api('guardarUsuario', { usuario: d }); cerrar(); toast('Perfil guardado'); if (r2.claveTemporal) mostrarClave(d.nombre, r2.claveTemporal); if (u && u.id === S.usuario.id) { S.usuario = { ...S.usuario, ...r2.usuario }; guardarSesion(); } ruta(); }
+        try { const r2 = await api('guardarUsuario', { usuario: d }); cerrar(); toast('Perfil guardado'); if (u && u.id === S.usuario.id) { S.usuario = { ...S.usuario, ...r2.usuario }; guardarSesion(); } await ruta(); if (r2.claveTemporal) mostrarClave(d.nombre, r2.claveTemporal); }
         catch (er) { toast(er.message, true); }
       };
       const bb = $('[data-borrar]', m); if (bb) bb.onclick = async () => { cerrar(); if (!await confirmar(`¿Borrar el perfil de ${u.nombre}?`, 'No se puede deshacer. Sus evaluaciones entregadas se conservan.', 'Borrar')) return; try { await api('borrarUsuario', { id: u.id }); toast('Perfil borrado'); ruta(); } catch (er) { toast(er.message, true); } };
