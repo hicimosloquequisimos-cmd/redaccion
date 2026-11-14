@@ -1,0 +1,1125 @@
+[
+ {
+  "clave": "poemas",
+  "nombre": "Poesía",
+  "nota": "Extensión admitida: hasta 60 versos por poema",
+  "archivo": "plantillas/poemas.docx",
+  "criterios": [
+   {
+    "nombre": "Imagen y lenguaje figurado",
+    "niveles": [
+     "Ausencia de imágenes o recurso a figuras gastadas sin función en el poema.",
+     "Imágenes previsibles o forzadas que no dialogan entre sí.",
+     "Imágenes claras con algún hallazgo; predominan las fórmulas conocidas.",
+     "Imágenes sugerentes y bien articuladas; alguna resulta débil o explicativa.",
+     "Imágenes potentes y propias que abren sentidos nuevos."
+    ]
+   },
+   {
+    "nombre": "Ritmo y musicalidad",
+    "niveles": [
+     "No hay ritmo perceptible; el corte de verso parece arbitrario.",
+     "Ritmo irregular sin intención; cacofonías o rimas forzadas.",
+     "Ritmo aceptable con tropiezos; el encabalgamiento se usa poco o sin función.",
+     "Ritmo sostenido y cortes de verso eficaces; hay pasajes que se aplanan.",
+     "Musicalidad lograda; ritmo, pausas y sonoridad sostienen el sentido."
+    ]
+   },
+   {
+    "nombre": "Unidad y construcción",
+    "niveles": [
+     "Versos desarticulados, sin eje ni progresión.",
+     "El eje es difuso; sobran versos o estrofas y el cierre es débil.",
+     "Poema coherente con desarrollo irregular o un cierre previsible.",
+     "Construcción sólida; algún verso o estrofa requiere ajuste.",
+     "Unidad plena; cada verso es necesario y el cierre resignifica el poema."
+    ]
+   },
+   {
+    "nombre": "Originalidad y propuesta estética",
+    "niveles": [
+     "Reproduce temas y modelos conocidos sin aporte propio.",
+     "Tema trillado, tratado con soluciones previsibles.",
+     "Tema conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva el tema; persiste algún lugar común.",
+     "Propuesta singular que sorprende y amplía el tema."
+    ]
+   },
+   {
+    "nombre": "Precisión léxica y corrección",
+    "niveles": [
+     "Léxico impreciso y errores graves que dificultan la lectura.",
+     "Palabras de relleno, adjetivación excesiva y errores frecuentes.",
+     "Léxico adecuado con algún error o palabra prescindible.",
+     "Léxico preciso; errores mínimos corregibles en revisión.",
+     "Cada palabra es exacta; todo desvío de la norma es deliberado."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título del poema",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "cuentos",
+  "nombre": "Cuento",
+  "nota": "Extensión admitida: de 800 a 4.000 palabras",
+  "archivo": "plantillas/cuentos.docx",
+  "criterios": [
+   {
+    "nombre": "Estructura y trama",
+    "niveles": [
+     "No hay conflicto identificable; la secuencia es desordenada y carece de cierre.",
+     "El conflicto es difuso; la tensión no progresa y el final resulta arbitrario.",
+     "Conflicto claro con progresión irregular; el cierre es previsible o apresurado.",
+     "Conflicto bien planteado y tensión sostenida; el cierre requiere ajustes menores.",
+     "Estructura sólida, tensión creciente y un final significativo."
+    ]
+   },
+   {
+    "nombre": "Personajes",
+    "niveles": [
+     "Personajes confusos, sin motivación ni función en el relato.",
+     "Personajes esquemáticos; sus acciones carecen de motivación clara.",
+     "Personajes reconocibles con motivaciones parciales y poca profundidad.",
+     "Personajes verosímiles y motivados; algún rasgo necesita desarrollo.",
+     "Personajes complejos y memorables, revelados por sus actos y decisiones."
+    ]
+   },
+   {
+    "nombre": "Lenguaje y estilo",
+    "niveles": [
+     "Lenguaje impreciso y repetitivo; imágenes inexistentes o forzadas.",
+     "Léxico pobre, ritmo irregular y abundancia de clichés.",
+     "Lenguaje correcto y funcional, con pocas imágenes propias.",
+     "Lenguaje preciso y con ritmo; algunos pasajes sobran o se diluyen.",
+     "Lenguaje preciso, rítmico y económico; imágenes potentes y propias."
+    ]
+   },
+   {
+    "nombre": "Originalidad y propuesta estética",
+    "niveles": [
+     "Reproduce tramas o modelos conocidos sin aporte propio.",
+     "Tema trillado, resuelto con soluciones previsibles.",
+     "Tema conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva el tema; persiste algún lugar común.",
+     "Propuesta singular que sorprende y amplía el tema."
+    ]
+   },
+   {
+    "nombre": "Corrección idiomática",
+    "niveles": [
+     "Errores graves y constantes de ortografía y sintaxis que dificultan la lectura.",
+     "Errores frecuentes de ortografía, puntuación o sintaxis.",
+     "Errores ocasionales que no afectan la comprensión.",
+     "Errores mínimos, corregibles en revisión de estilo.",
+     "Texto pulcro; todo desvío de la norma es deliberado y expresivo."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título del cuento",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "microrrelato",
+  "nombre": "Microrrelato",
+  "nota": "Extensión admitida: hasta 300 palabras",
+  "archivo": "plantillas/microrrelato.docx",
+  "criterios": [
+   {
+    "nombre": "Concisión y economía",
+    "niveles": [
+     "Texto extenso para lo que cuenta; sobran frases y explicaciones.",
+     "Redundancias y detalles prescindibles debilitan el efecto.",
+     "Texto breve con algunas palabras o frases prescindibles.",
+     "Economía lograda; alguna frase admite depuración.",
+     "Cada palabra es necesaria; nada sobra ni falta."
+    ]
+   },
+   {
+    "nombre": "Historia y elipsis",
+    "niveles": [
+     "No hay situación narrativa; es una reflexión, un chiste o una anécdota.",
+     "La historia se explica en exceso y no deja nada al lector.",
+     "Sugiere una historia, pero la elipsis es tímida o confusa.",
+     "La elipsis activa al lector; algún vacío resulta oscuro.",
+     "Lo no dicho sostiene el relato; el lector completa una historia mayor."
+    ]
+   },
+   {
+    "nombre": "Título",
+    "niveles": [
+     "Título ausente o sin relación con el texto.",
+     "Título obvio que anticipa o resume el relato.",
+     "Título adecuado pero sin función narrativa.",
+     "Título sugerente que orienta la lectura.",
+     "El título forma parte del relato y amplía su sentido."
+    ]
+   },
+   {
+    "nombre": "Cierre y efecto",
+    "niveles": [
+     "Final inexistente o sin efecto alguno.",
+     "Final explicativo o de remate previsible.",
+     "Final correcto con un efecto moderado.",
+     "Final eficaz y sorpresivo; podría afinarse.",
+     "Final que resignifica todo el texto y perdura en el lector."
+    ]
+   },
+   {
+    "nombre": "Voz propia y originalidad",
+    "niveles": [
+     "Reproduce modelos conocidos sin aporte propio.",
+     "Tema trillado, resuelto con soluciones previsibles.",
+     "Tema conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva el tema; persiste algún lugar común.",
+     "Voz singular y propuesta que sorprende y amplía el tema."
+    ]
+   },
+   {
+    "nombre": "Lenguaje y corrección",
+    "niveles": [
+     "Lenguaje impreciso y errores graves que dificultan la lectura.",
+     "Léxico pobre, clichés y errores frecuentes.",
+     "Lenguaje funcional con errores ocasionales.",
+     "Lenguaje preciso; errores mínimos corregibles en revisión.",
+     "Lenguaje exacto y sugerente; todo desvío de la norma es deliberado."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título del microrrelato",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "cronica",
+  "nombre": "Crónica",
+  "nota": "Extensión admitida: de 1.000 a 4.000 palabras (citas en APA 7.ª ed.)",
+  "archivo": "plantillas/cronica.docx",
+  "criterios": [
+   {
+    "nombre": "Investigación y veracidad",
+    "niveles": [
+     "Sin trabajo de campo; los hechos son vagos o inverificables.",
+     "Datos escasos o de segunda mano; se sostiene en opiniones.",
+     "Información suficiente con poca observación directa o pocas voces.",
+     "Buena observación y fuentes variadas; algún dato requiere precisión.",
+     "Inmersión evidente, datos precisos y fuentes citadas con rigor."
+    ]
+   },
+   {
+    "nombre": "Construcción narrativa",
+    "niveles": [
+     "Enumeración de hechos sin estructura ni escenas.",
+     "Predomina el resumen informativo; la estructura es plana.",
+     "Alterna escena y resumen con ritmo irregular.",
+     "Estructura eficaz con escenas logradas; algún tramo decae.",
+     "Escenas vivas y una estructura que sostiene la tensión hasta el final."
+    ]
+   },
+   {
+    "nombre": "Personajes y voces",
+    "niveles": [
+     "Las personas aparecen como nombres sin presencia.",
+     "Testimonios planos o usados como cita de relleno.",
+     "Personajes reconocibles con poca profundidad.",
+     "Personajes y voces bien perfilados; alguno queda esbozado.",
+     "Personajes complejos; sus voces conservan su propio registro."
+    ]
+   },
+   {
+    "nombre": "Mirada y contexto",
+    "niveles": [
+     "Sin punto de vista; el texto no interpreta lo que narra.",
+     "Mirada superficial o juicios sin sustento.",
+     "Mirada presente pero convencional; contexto apenas esbozado.",
+     "Mirada propia que interpreta el contexto; algún juicio sobra.",
+     "Mirada singular que ilumina su tiempo y su territorio."
+    ]
+   },
+   {
+    "nombre": "Ética del relato",
+    "niveles": [
+     "Expone a personas identificables sin consentimiento o las ridiculiza.",
+     "Trato descuidado de las fuentes o de experiencias sensibles.",
+     "Trato respetuoso con algún riesgo de exposición sin resolver.",
+     "Trato cuidadoso; un detalle menor por revisar.",
+     "Trato riguroso y respetuoso de las personas y sus experiencias."
+    ]
+   },
+   {
+    "nombre": "Lenguaje y corrección",
+    "niveles": [
+     "Prosa confusa y errores graves que dificultan la lectura.",
+     "Prosa plana, con clichés periodísticos y errores frecuentes.",
+     "Prosa clara y funcional con errores ocasionales.",
+     "Prosa precisa y con ritmo; errores mínimos corregibles.",
+     "Prosa exacta y expresiva; texto pulcro."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la crónica",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "ensayo",
+  "nombre": "Ensayo literario o de creación",
+  "nota": "Extensión admitida: de 1.200 a 3.500 palabras (citas en APA 7.ª ed.)",
+  "archivo": "plantillas/ensayo.docx",
+  "criterios": [
+   {
+    "nombre": "Idea o pregunta central",
+    "niveles": [
+     "No se identifica una idea o pregunta que oriente el texto.",
+     "Idea general o difusa; el texto se dispersa.",
+     "Idea clara pero predecible o poco desarrollada.",
+     "Idea sugerente y bien sostenida; algún tramo se desvía.",
+     "Pregunta potente que el texto piensa con hondura y deja abierta."
+    ]
+   },
+   {
+    "nombre": "Desarrollo del pensamiento",
+    "niveles": [
+     "Afirmaciones sueltas sin hilo.",
+     "Ideas repetidas o encadenadas sin progresión.",
+     "Desarrollo coherente con saltos o vacíos.",
+     "Pensamiento que avanza y se matiza; alguna transición es débil.",
+     "Pensamiento que se descubre a sí mismo y avanza con naturalidad."
+    ]
+   },
+   {
+    "nombre": "Diálogo con referentes",
+    "niveles": [
+     "Sin referentes, o citas copiadas sin integrar.",
+     "Referencias decorativas o mal atribuidas.",
+     "Referentes pertinentes con integración parcial; citación irregular.",
+     "Diálogo productivo con otras obras; detalles de citación por ajustar.",
+     "Referentes integrados al pensamiento propio y citados con rigor."
+    ]
+   },
+   {
+    "nombre": "Trabajo con el lenguaje",
+    "niveles": [
+     "Prosa confusa y repetitiva.",
+     "Prosa plana, con abuso de lugares comunes.",
+     "Prosa clara y funcional, con pocas imágenes propias.",
+     "Prosa precisa y con ritmo; algunos pasajes se diluyen.",
+     "Prosa exacta, rítmica y sugerente; la forma es parte de la idea."
+    ]
+   },
+   {
+    "nombre": "Corrección idiomática",
+    "niveles": [
+     "Errores graves y constantes que dificultan la lectura.",
+     "Errores frecuentes de ortografía, puntuación o sintaxis.",
+     "Errores ocasionales que no afectan la comprensión.",
+     "Errores mínimos, corregibles en revisión de estilo.",
+     "Texto pulcro; todo desvío de la norma es deliberado."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título del ensayo",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "formas_hibridas",
+  "nombre": "Formas híbridas",
+  "nota": "Extensión admitida: hasta 3.000 palabras",
+  "archivo": "plantillas/formas_hibridas.docx",
+  "criterios": [
+   {
+    "nombre": "Lógica genérica propia",
+    "niveles": [
+     "La mezcla de géneros parece accidental; no hay criterio.",
+     "La propuesta se insinúa pero no se sostiene.",
+     "Lógica identificable con inconsistencias.",
+     "Lógica clara y sostenida; algún tramo la contradice.",
+     "La obra declara y sostiene con rigor su propia lógica."
+    ]
+   },
+   {
+    "nombre": "Forma y búsqueda expresiva",
+    "niveles": [
+     "La forma no guarda relación con lo que se quiere decir.",
+     "La forma es un efecto superficial.",
+     "La forma acompaña al contenido sin potenciarlo.",
+     "Forma y sentido se refuerzan; algún recurso es gratuito.",
+     "La forma es inseparable de lo que la obra dice."
+    ]
+   },
+   {
+    "nombre": "Integración de registros",
+    "niveles": [
+     "Fragmentos yuxtapuestos sin relación.",
+     "Los registros conviven sin dialogar.",
+     "Integración parcial; algunos pasajes quedan aislados.",
+     "Registros bien articulados; alguna transición es brusca.",
+     "Los registros se transforman entre sí y crean un lenguaje nuevo."
+    ]
+   },
+   {
+    "nombre": "Lenguaje y estilo",
+    "niveles": [
+     "Lenguaje impreciso y repetitivo; imágenes inexistentes o forzadas.",
+     "Léxico pobre, ritmo irregular y abundancia de clichés.",
+     "Lenguaje correcto y funcional, con pocas imágenes propias.",
+     "Lenguaje preciso y con ritmo; algunos pasajes sobran o se diluyen.",
+     "Lenguaje preciso, rítmico y económico; imágenes potentes y propias."
+    ]
+   },
+   {
+    "nombre": "Voz propia y originalidad",
+    "niveles": [
+     "Reproduce modelos conocidos sin aporte propio.",
+     "Tema trillado, resuelto con soluciones previsibles.",
+     "Tema conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva el tema; persiste algún lugar común.",
+     "Voz singular y propuesta que sorprende y amplía el tema."
+    ]
+   },
+   {
+    "nombre": "Corrección idiomática",
+    "niveles": [
+     "Errores graves y constantes que dificultan la lectura.",
+     "Errores frecuentes de ortografía, puntuación o sintaxis.",
+     "Errores ocasionales que no afectan la comprensión.",
+     "Errores mínimos, corregibles en revisión de estilo.",
+     "Texto pulcro; desvíos y marcas de oralidad son deliberados."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "fragmento",
+  "nombre": "Fragmento de obra mayor",
+  "nota": "Extensión admitida: de 800 a 3.000 palabras",
+  "archivo": "plantillas/fragmento.docx",
+  "criterios": [
+   {
+    "nombre": "Autonomía de lectura",
+    "niveles": [
+     "Incomprensible sin el resto de la obra.",
+     "Depende en exceso de información ausente.",
+     "Se entiende con esfuerzo; algunas referencias quedan sueltas.",
+     "Se lee de manera autónoma; algún cabo suelto distrae.",
+     "Funciona como pieza completa y despierta interés por la obra mayor."
+    ]
+   },
+   {
+    "nombre": "Unidad interna",
+    "niveles": [
+     "Corte arbitrario al inicio y al final.",
+     "Empieza o termina en un punto débil.",
+     "Unidad aceptable con un cierre poco significativo.",
+     "Buen arco interno; el corte final podría afinarse.",
+     "Arco completo; el corte final tiene fuerza propia."
+    ]
+   },
+   {
+    "nombre": "Construcción",
+    "niveles": [
+     "Personajes, situaciones o ideas confusos y sin desarrollo.",
+     "Desarrollo esquemático y previsible.",
+     "Desarrollo adecuado con poca profundidad.",
+     "Desarrollo sólido; algún elemento necesita ajuste.",
+     "Desarrollo rico que revela la ambición de la obra mayor."
+    ]
+   },
+   {
+    "nombre": "Lenguaje y estilo",
+    "niveles": [
+     "Lenguaje impreciso y repetitivo; imágenes inexistentes o forzadas.",
+     "Léxico pobre, ritmo irregular y abundancia de clichés.",
+     "Lenguaje correcto y funcional, con pocas imágenes propias.",
+     "Lenguaje preciso y con ritmo; algunos pasajes sobran o se diluyen.",
+     "Lenguaje preciso, rítmico y económico; imágenes potentes y propias."
+    ]
+   },
+   {
+    "nombre": "Voz propia y originalidad",
+    "niveles": [
+     "Reproduce modelos conocidos sin aporte propio.",
+     "Tema trillado, resuelto con soluciones previsibles.",
+     "Tema conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva el tema; persiste algún lugar común.",
+     "Voz singular y propuesta que sorprende y amplía el tema."
+    ]
+   },
+   {
+    "nombre": "Corrección idiomática",
+    "niveles": [
+     "Errores graves y constantes que dificultan la lectura.",
+     "Errores frecuentes de ortografía, puntuación o sintaxis.",
+     "Errores ocasionales que no afectan la comprensión.",
+     "Errores mínimos, corregibles en revisión de estilo.",
+     "Texto pulcro; todo desvío de la norma es deliberado."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título del fragmento y de la obra",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "dramaturgia",
+  "nombre": "Dramaturgia breve",
+  "nota": "Extensión admitida: desde 1 escena hasta 3.500 palabras",
+  "archivo": "plantillas/dramaturgia.docx",
+  "criterios": [
+   {
+    "nombre": "Conflicto y acción",
+    "niveles": [
+     "No hay conflicto; las escenas no generan acción.",
+     "Conflicto difuso; la acción se estanca.",
+     "Conflicto claro con progresión irregular.",
+     "Conflicto sólido y acción sostenida; el desenlace requiere ajustes.",
+     "Conflicto potente que avanza hasta un desenlace significativo."
+    ]
+   },
+   {
+    "nombre": "Personajes",
+    "niveles": [
+     "Personajes indistintos, sin objetivos.",
+     "Personajes esquemáticos con objetivos poco claros.",
+     "Personajes definidos con poca contradicción.",
+     "Deseos y obstáculos claros; algún personaje se queda corto.",
+     "Personajes complejos que se revelan en lo que hacen y dicen."
+    ]
+   },
+   {
+    "nombre": "Diálogo",
+    "niveles": [
+     "Diálogos explicativos o artificiales; todos hablan igual.",
+     "Diálogos que informan más de lo que dramatizan.",
+     "Diálogos funcionales con poco subtexto.",
+     "Diálogos vivos con subtexto; algún parlamento sobra.",
+     "Diálogos precisos; cada personaje tiene voz propia."
+    ]
+   },
+   {
+    "nombre": "Teatralidad",
+    "niveles": [
+     "Texto narrativo sin pensamiento escénico.",
+     "Acotaciones excesivas o ausentes; la puesta es inviable.",
+     "Escenificable, con indicaciones poco claras.",
+     "Buen pensamiento escénico; alguna acotación sobra o falta.",
+     "Espacio, tiempo y cuerpo en escena construyen sentido."
+    ]
+   },
+   {
+    "nombre": "Lenguaje y formato",
+    "niveles": [
+     "Errores graves y formato dramático confuso (nombres, acotaciones).",
+     "Errores frecuentes y formato irregular.",
+     "Errores ocasionales; formato comprensible.",
+     "Errores mínimos; formato claro con detalles por ajustar.",
+     "Texto pulcro y formato dramático impecable."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del texto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "historieta_comic",
+  "nombre": "Historieta o cómic",
+  "nota": "Extensión admitida: hasta 12 páginas · .pdf o .jpg por página, 2.000 px de alto",
+  "archivo": "plantillas/historieta_comic.docx",
+  "criterios": [
+   {
+    "nombre": "Secuencia y coherencia narrativa",
+    "niveles": [
+     "Viñetas sin orden; no se comprende qué historia se cuenta.",
+     "Saltos o viñetas mal ubicadas; el hilo se pierde en varios tramos.",
+     "Se entiende la idea general; algunos saltos obligan a releer.",
+     "Orden lógico; una o dos transiciones poco claras.",
+     "Lectura fluida, orden lógico y transiciones suaves entre viñetas."
+    ]
+   },
+   {
+    "nombre": "Inicio, desarrollo y desenlace",
+    "niveles": [
+     "Escenas sueltas sin historia.",
+     "Falta una de las partes, el desarrollo es confuso o el final incoherente.",
+     "Las tres partes existen; alguna es débil o apresurada.",
+     "Partes presentes y conectadas; el final podría ser más sólido.",
+     "Inicio con contexto, conflicto coherente y desenlace satisfactorio."
+    ]
+   },
+   {
+    "nombre": "Página y cartuchos",
+    "niveles": [
+     "Sin organización visible; viñetas y cartuchos se confunden o superponen.",
+     "Organización confusa; el recorrido de lectura se pierde en varios tramos.",
+     "Organización razonable con desequilibrios; el recorrido exige esfuerzo.",
+     "Distribución adecuada; alguna zona saturada o vacía.",
+     "Distribución equilibrada; el espacio da ritmo y claridad a la historia."
+    ]
+   },
+   {
+    "nombre": "Diálogo, globos y onomatopeyas",
+    "niveles": [
+     "Diálogos confusos o ausentes; sin globos ni onomatopeyas reconocibles.",
+     "Diálogos poco claros y globos difíciles de leer.",
+     "Diálogos comprensibles; algunos globos confunden el orden de lectura.",
+     "Diálogos y globos adecuados; alguna onomatopeya repetida o mal ubicada.",
+     "Diálogos claros y diferenciados; globos y onomatopeyas refuerzan la acción."
+    ]
+   },
+   {
+    "nombre": "Expresión visual y dibujo",
+    "niveles": [
+     "Dibujos ininteligibles o generados con IA sin intervención propia.",
+     "Dibujos poco legibles; cuesta entender acción y emociones. Si hubo IA, aporte propio mínimo.",
+     "Dibujos simples y poco expresivos; de autoría propia.",
+     "Dibujos claros y acordes a la historia, de autoría propia.",
+     "Dibujos expresivos de autoría propia."
+    ]
+   },
+   {
+    "nombre": "Rotulación y legibilidad",
+    "niveles": [
+     "Letra ilegible; el texto no puede leerse.",
+     "Letra difícil de leer en varios tramos por forma, tamaño o espaciado.",
+     "Texto legible con esfuerzo; letras poco claras o espaciado irregular.",
+     "Letra legible con pequeñas variaciones de tamaño o espaciado.",
+     "Letra clara, uniforme y de buen tamaño; se lee sin esfuerzo."
+    ]
+   },
+   {
+    "nombre": "Ortografía y puntuación",
+    "niveles": [
+     "Errores constantes que dificultan la lectura; signos mal usados.",
+     "Errores frecuentes; signos incompletos o mal ubicados.",
+     "Errores ocasionales que no impiden entender el texto.",
+     "Erratas menores; signos bien usados casi siempre.",
+     "Ortografía y puntuación correctas; todo desvío es deliberado."
+    ]
+   },
+   {
+    "nombre": "Voz propia y presentación digital",
+    "niveles": [
+     "Sin aporte propio; el archivo no respeta el formato pedido.",
+     "Poca creatividad y poco cuidado; incumple partes del formato.",
+     "Presentación correcta pero poco original; imagen irregular o archivo mal nombrado.",
+     "Presentación cuidada y con rasgos propios; ligeras desviaciones del formato.",
+     "Propuesta original y cuidada; formato, resolución y descripciones alternativas en regla."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del artefacto",
+   "Evaluador(a)"
+  ],
+  "conEnlace": false
+ },
+ {
+  "clave": "cortometraje_performance",
+  "nombre": "Cortometraje y registro de performance",
+  "nota": "Duración admitida: hasta 15 minutos · .mp4 (H.264), 1080p, 16:9",
+  "archivo": "plantillas/cortometraje_performance.docx",
+  "criterios": [
+   {
+    "nombre": "Propuesta (guion o concepto)",
+    "niveles": [
+     "No se identifica historia, idea o concepto.",
+     "Propuesta difusa o predecible.",
+     "Propuesta clara con desarrollo irregular.",
+     "Propuesta sólida; algún tramo pierde tensión.",
+     "Propuesta potente que sostiene la pieza de principio a fin."
+    ]
+   },
+   {
+    "nombre": "Puesta en escena y cuerpo",
+    "niveles": [
+     "Actuación o acción sin intención; el espacio no se aprovecha.",
+     "Interpretación forzada o acción desarticulada.",
+     "Puesta correcta con pocas decisiones expresivas.",
+     "Cuerpo, espacio y acción con intención; algún momento decae.",
+     "Cuerpo, espacio y acción producen un sentido singular."
+    ]
+   },
+   {
+    "nombre": "Lenguaje audiovisual",
+    "niveles": [
+     "Encuadre y montaje impiden seguir la obra o la acción.",
+     "Cámara y montaje sin criterio; el sonido distrae.",
+     "Lenguaje correcto y funcional, sin decisiones propias.",
+     "Encuadre, montaje y sonido con intención; algún recurso sobra.",
+     "Cámara y montaje amplían la obra o la acción registrada."
+    ]
+   },
+   {
+    "nombre": "Calidad técnica según la propuesta",
+    "niveles": [
+     "Fallos de audio, imagen o archivo que impiden apreciar la obra.",
+     "Fallos frecuentes que distraen y no responden a una decisión estética.",
+     "Factura aceptable con fallos ocasionales.",
+     "Buena factura; detalles técnicos por ajustar.",
+     "Factura coherente con la propuesta, pulida o deliberadamente precaria."
+    ]
+   },
+   {
+    "nombre": "Accesibilidad y derechos",
+    "niveles": [
+     "Sin subtítulos; materiales o personas de terceros sin autorización.",
+     "Subtítulos incompletos; créditos o licencias sin aclarar.",
+     "Subtítulos y créditos completos, con errores importantes.",
+     "Subtítulos, créditos y autorizaciones con detalles por ajustar.",
+     "Subtítulos fieles; créditos, licencias y consentimientos en regla."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del artefacto",
+   "Evaluador(a)",
+   "Enlace o archivo"
+  ],
+  "conEnlace": true
+ },
+ {
+  "clave": "videopoema_videoensayo",
+  "nombre": "Videopoema y videoensayo",
+  "nota": "Duración admitida: hasta 5 minutos · .mp4 1080p, 16:9 o 9:16",
+  "archivo": "plantillas/videopoema_videoensayo.docx",
+  "criterios": [
+   {
+    "nombre": "Texto o idea",
+    "niveles": [
+     "Texto o idea ausente o sin desarrollo.",
+     "Texto débil o idea difusa que se apoya solo en la imagen.",
+     "Texto o idea clara con desarrollo irregular.",
+     "Texto o idea sólida; algún pasaje se diluye.",
+     "Poema o pensamiento potente que crece con la imagen."
+    ]
+   },
+   {
+    "nombre": "Relación palabra e imagen",
+    "niveles": [
+     "Imagen y palabra sin relación.",
+     "La imagen ilustra literalmente lo que se dice.",
+     "Relación pertinente con pasajes meramente ilustrativos.",
+     "Palabra e imagen dialogan; algún plano es decorativo.",
+     "Palabra e imagen crean juntas un sentido que ninguna tiene sola."
+    ]
+   },
+   {
+    "nombre": "Montaje y sonido",
+    "niveles": [
+     "Montaje confuso y sonido que interfiere o es ininteligible.",
+     "Cortes bruscos, planos excesivos o música de relleno.",
+     "Montaje y sonido correctos con ritmo irregular.",
+     "Ritmo sostenido y sonido integrado; alguna secuencia se alarga.",
+     "Montaje, voz y sonido construyen el ritmo y el sentido de la pieza."
+    ]
+   },
+   {
+    "nombre": "Calidad técnica según la propuesta",
+    "niveles": [
+     "Fallos de audio, imagen o archivo que impiden apreciar la obra.",
+     "Fallos frecuentes que distraen y no responden a una decisión estética.",
+     "Factura aceptable con fallos ocasionales.",
+     "Buena factura; detalles técnicos por ajustar.",
+     "Factura coherente con la propuesta, pulida o deliberadamente precaria."
+    ]
+   },
+   {
+    "nombre": "Voz propia y originalidad",
+    "niveles": [
+     "Reproduce formatos y modelos conocidos sin aporte propio.",
+     "Idea trillada, resuelta con fórmulas o efectos previsibles.",
+     "Formato conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva la forma; persiste algún lugar común.",
+     "Voz singular; la propuesta sorprende y amplía el lenguaje elegido."
+    ]
+   },
+   {
+    "nombre": "Accesibilidad y derechos",
+    "niveles": [
+     "Sin subtítulos; materiales o personas de terceros sin autorización.",
+     "Subtítulos incompletos; créditos o licencias sin aclarar.",
+     "Subtítulos y créditos completos, con errores importantes.",
+     "Subtítulos, créditos y autorizaciones con detalles por ajustar.",
+     "Subtítulos fieles; créditos, licencias y consentimientos en regla."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del artefacto",
+   "Evaluador(a)",
+   "Enlace o archivo"
+  ],
+  "conEnlace": true
+ },
+ {
+  "clave": "obra_sonora_podcast",
+  "nombre": "Obra sonora y podcast de creación",
+  "nota": "Duración admitida: hasta 15 minutos · .mp3  o .wav",
+  "archivo": "plantillas/obra_sonora_podcast.docx",
+  "criterios": [
+   {
+    "nombre": "Propuesta y guion",
+    "niveles": [
+     "No se identifica una propuesta; el contenido es disperso.",
+     "Idea básica poco desarrollada; la pieza divaga.",
+     "Propuesta clara con desarrollo irregular o previsible.",
+     "Propuesta sólida y bien estructurada; algún tramo decae.",
+     "Propuesta potente que sostiene la escucha de principio a fin."
+    ]
+   },
+   {
+    "nombre": "Voz y locución",
+    "niveles": [
+     "Lectura plana o ininteligible; la voz no comunica.",
+     "Interpretación monótona o forzada.",
+     "Interpretación correcta con poca intención expresiva.",
+     "Voz expresiva y clara; algunos pasajes pierden fuerza.",
+     "Interpretación singular; la voz es parte del sentido de la obra."
+    ]
+   },
+   {
+    "nombre": "Diseño sonoro y montaje",
+    "niveles": [
+     "Sonidos sin relación con la obra o que tapan la voz.",
+     "Música o efectos de relleno; montaje brusco.",
+     "Diseño sonoro funcional con poco aporte de sentido.",
+     "Música, ambientes y silencios integrados; algún recurso sobra.",
+     "El sonido construye un espacio y un sentido propios."
+    ]
+   },
+   {
+    "nombre": "Calidad técnica según la propuesta",
+    "niveles": [
+     "Fallos de audio, imagen o archivo que impiden apreciar la obra.",
+     "Fallos frecuentes que distraen y no responden a una decisión estética.",
+     "Factura aceptable con fallos ocasionales.",
+     "Buena factura; detalles técnicos por ajustar.",
+     "Factura coherente con la propuesta, pulida o deliberadamente precaria."
+    ]
+   },
+   {
+    "nombre": "Voz propia y originalidad",
+    "niveles": [
+     "Reproduce formatos y modelos conocidos sin aporte propio.",
+     "Idea trillada, resuelta con fórmulas o efectos previsibles.",
+     "Formato conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva la forma; persiste algún lugar común.",
+     "Voz singular; la propuesta sorprende y amplía el lenguaje elegido."
+    ]
+   },
+   {
+    "nombre": "Accesibilidad y derechos",
+    "niveles": [
+     "Sin transcripción; música o voces de terceros sin autorización.",
+     "Transcripción incompleta; créditos o licencias sin aclarar.",
+     "Transcripción y créditos completos, con errores importantes.",
+     "Transcripción, créditos y autorizaciones con detalles por ajustar.",
+     "Transcripción fiel; créditos, licencias y consentimientos en regla (incluida la tradición oral)."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del artefacto",
+   "Evaluador(a)",
+   "Enlace o archivo"
+  ],
+  "conEnlace": true
+ },
+ {
+  "clave": "narrativa_redes",
+  "nombre": "Narrativa para redes sociales",
+  "nota": "Extensión admitida: hasta 10 publicaciones · capturas .png o enlace",
+  "archivo": "plantillas/narrativa_redes.docx",
+  "criterios": [
+   {
+    "nombre": "Propuesta narrativa o poética",
+    "niveles": [
+     "No se identifica una historia, tema o sentido; el contenido es disperso.",
+     "Idea básica poco desarrollada; el texto depende del efecto visual.",
+     "Propuesta comprensible con desarrollo irregular o previsible.",
+     "Propuesta clara y bien construida; algún tramo pierde fuerza.",
+     "Propuesta literaria sólida que sostiene la obra por sí misma."
+    ]
+   },
+   {
+    "nombre": "Secuencia y serialidad",
+    "niveles": [
+     "Publicaciones sueltas sin hilo.",
+     "Secuencia confusa; algunas piezas sobran.",
+     "Hilo claro con progresión irregular.",
+     "Serie bien articulada; alguna publicación es débil.",
+     "Cada publicación avanza la obra y deja deseo de la siguiente."
+    ]
+   },
+   {
+    "nombre": "Lenguaje de la red",
+    "niveles": [
+     "Contenido trasladado sin adaptarse a la red.",
+     "Uso superficial o decorativo de los recursos de la red.",
+     "Aprovecha algunos recursos; funcionaría igual fuera de la red.",
+     "Buen uso del formato nativo; algún recurso se desaprovecha.",
+     "Convierte los códigos de la red en recurso literario."
+    ]
+   },
+   {
+    "nombre": "Integración de lenguajes",
+    "niveles": [
+     "Imagen, sonido o video sin relación con el texto; función decorativa.",
+     "Los lenguajes conviven pero repiten lo que el texto ya dice.",
+     "Algunos elementos aportan sentido; otros son ornamentales.",
+     "Los lenguajes se complementan; algún recurso resulta prescindible.",
+     "Texto, imagen, sonido o movimiento construyen juntos el sentido."
+    ]
+   },
+   {
+    "nombre": "Voz propia y originalidad",
+    "niveles": [
+     "Reproduce formatos y modelos conocidos sin aporte propio.",
+     "Idea trillada, resuelta con fórmulas o efectos previsibles.",
+     "Formato conocido con algún matiz o hallazgo personal.",
+     "Mirada propia que renueva la forma; persiste algún lugar común.",
+     "Voz singular; la propuesta sorprende y amplía el lenguaje elegido."
+    ]
+   },
+   {
+    "nombre": "Presentación y accesibilidad",
+    "niveles": [
+     "Capturas ilegibles o enlace roto; errores graves de escritura.",
+     "Orden confuso de publicaciones; errores frecuentes.",
+     "Material legible con fallos menores.",
+     "Material completo y legible; detalles por ajustar.",
+     "Material ordenado y legible, con descripciones y derechos en regla."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del artefacto",
+   "Evaluador(a)",
+   "Red y enlace"
+  ],
+  "conEnlace": true
+ },
+ {
+  "clave": "narrativas_digitales",
+  "nombre": "Narrativas digitales",
+  "nota": "Extensión admitida: recorrido de hasta 20 minutos · enlace público o archivo .html / Twine",
+  "archivo": "plantillas/narrativas_digitales.docx",
+  "criterios": [
+   {
+    "nombre": "Propuesta narrativa o poética",
+    "niveles": [
+     "No se identifica una historia, tema o sentido; el contenido es disperso.",
+     "Idea básica poco desarrollada; el texto depende del efecto visual.",
+     "Propuesta comprensible con desarrollo irregular o previsible.",
+     "Propuesta clara y bien construida; algún tramo pierde fuerza.",
+     "Propuesta literaria sólida que sostiene la obra por sí misma."
+    ]
+   },
+   {
+    "nombre": "Integración de lenguajes",
+    "niveles": [
+     "Imagen, sonido o video sin relación con el texto; función decorativa.",
+     "Los lenguajes conviven pero repiten lo que el texto ya dice.",
+     "Algunos elementos aportan sentido; otros son ornamentales.",
+     "Los lenguajes se complementan; algún recurso resulta prescindible.",
+     "Texto, imagen, sonido o movimiento construyen juntos el sentido."
+    ]
+   },
+   {
+    "nombre": "Recorrido e interacción",
+    "niveles": [
+     "Navegación confusa o rota; el lector se pierde.",
+     "Interacción mínima o arbitraria; los recorridos no tienen lógica.",
+     "Recorrido claro pero lineal; la participación del lector es limitada.",
+     "Recorridos coherentes que invitan a explorar; algún tramo es confuso.",
+     "La participación del lector es parte del sentido de la obra."
+    ]
+   },
+   {
+    "nombre": "Uso del medio digital",
+    "niveles": [
+     "Texto trasladado a pantalla sin uso de las posibilidades digitales.",
+     "Uso superficial del soporte o de las plataformas.",
+     "El medio aporta algo; la obra funcionaría casi igual impresa.",
+     "Buen uso del soporte; cada plataforma o pieza suma contenido.",
+     "La obra solo es posible en este medio; cada pieza expande el relato."
+    ]
+   },
+   {
+    "nombre": "Originalidad y propuesta estética",
+    "niveles": [
+     "Reproduce formatos y contenidos conocidos sin aporte propio.",
+     "Idea trillada resuelta con plantillas o efectos previsibles.",
+     "Formato conocido con algún matiz o hallazgo personal.",
+     "Mirada propia y diseño coherente; persiste algún lugar común.",
+     "Propuesta singular que renueva la relación entre literatura y medio."
+    ]
+   },
+   {
+    "nombre": "Aspecto técnico y corrección",
+    "niveles": [
+     "Enlaces rotos, archivos que no cargan y errores graves de escritura.",
+     "Fallos técnicos frecuentes y errores de ortografía o sintaxis.",
+     "Funciona con fallos menores; errores ocasionales de escritura.",
+     "Funciona bien y es legible; detalles corregibles en revisión.",
+     "Funciona en todo dispositivo, es accesible y el texto está pulido."
+    ]
+   }
+  ],
+  "niveles": [
+   "1 · Deficiente",
+   "2 · Insuficiente",
+   "3 · Aceptable",
+   "4 · Bueno",
+   "5 · Excelente"
+  ],
+  "campos": [
+   "Título de la obra",
+   "Fecha",
+   "Código del artefacto",
+   "Evaluador(a)",
+   "Enlace y plataformas"
+  ],
+  "conEnlace": true
+ }
+]
