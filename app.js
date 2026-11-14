@@ -357,6 +357,7 @@
         acciones.push('<button class="btn btn--chico" data-editar>Editar datos</button>');
       }
       if (dir && e.estado === 'revision_directora') acciones.push(`<button class="btn btn--verde" data-decidir="confirmar">Aprobar para publicar</button><a class="btn btn--rojo" href="#corregir/${esc(e.id)}">Hacer correcciones${e.dirCorr && e.dirCorr.borrador && e.dirCorr.borrador.anotaciones.length ? ' (borrador)' : ''}</a><button class="btn" data-decidir="devolver">Devolver a la Auxiliar</button>`);
+      if (tiene('admin') && !aux) acciones.push('<button class="btn btn--chico" data-borrar-admin style="color:var(--rojo);border-color:var(--rojo);margin-left:auto">Borrar envío</button>');
       if (pla && e.estado === 'listo_publicar') acciones.push('<button class="btn btn--verde" data-publicado>Marcar como publicada</button>');
       const r = rubrica(e.rubrica);
       return `<div class="migas"><a href="#${aux ? 'envios' : dir ? 'revisar' : 'publicar'}">${aux ? 'Envíos' : dir ? 'Para revisar' : 'Listos para publicar'}</a> › ${esc(e.id)}</div>
@@ -402,6 +403,7 @@
           $('[data-si]', m).onclick = async () => { const nota = $('[name=nota]', m).value; if (!confirma && !nota.trim()) return toast('Escribe la nota.', true); try { await api('decidir', { envioId: e.id, decision: b.dataset.decidir, nota }); cerrar(); toast(confirma ? 'Aprobado. La Auxiliar ya fue avisada.' : 'Devuelto a la Auxiliar'); ruta(); } catch (er) { toast(er.message, true); } };
         });
       });
+      const ba = $('[data-borrar-admin]'); if (ba) ba.onclick = () => modalBorrarEnvio(e);
       const vd = $('[data-ver-dir]'); if (vd) vd.onclick = () => verCorrDirectora(e);
       const pf = $('[data-plataforma]'); if (pf) pf.onclick = () => modalPlataforma(e);
       const pu = $('[data-publicado]'); if (pu) pu.onclick = () => modal(`<h2>Marcar como publicada</h2><p class="suave">Pega el enlace de la obra en la gaceta (opcional).</p><label class="campo"><span>Enlace en la gaceta</span><input type="url" name="url" placeholder="https://hicimosloquequisimos-cmd.github.io/obra/…"></label><div class="botones"><button class="btn btn--verde" data-si>Marcar como publicada</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
@@ -495,6 +497,16 @@
       $('[data-si]', m).onclick = async () => { const f = $('[name=f]', m).files[0]; if (!f) return toast('Elige el archivo.', true); try { const d = await leerArchivoLocal(f); await api('subirVersion', { envioId: e.id, ...d }); cerrar(); toast('Versión nueva guardada'); ruta(); } catch (er) { toast(er.message, true); } };
     });
   }
+  function modalBorrarEnvio(e) {
+    modal(`<h2>Borrar ${esc(e.id)}</h2><p class="suave">Se borra <b>todo</b> lo de «${esc(e.titulo)}»: evaluaciones, correcciones, historial y avisos. Los archivos van a la papelera de Drive y el correo vuelve a quedar sin registrar. <b>No se puede deshacer.</b></p><p class="suave">Úsalo para pruebas o envíos registrados por error. Si solo quieres archivarlo, mejor usa «Cerrar envío».</p>
+      <label class="campo"><span>Para confirmar, escribe el código: <b>${esc(e.id)}</b></span><input type="text" name="conf" autocomplete="off"></label>
+      <div class="botones"><button class="btn" data-si style="background:var(--rojo-osc);border-color:var(--rojo-osc);color:#fff">Borrar para siempre</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
+      $('[data-si]', m).onclick = async () => {
+        const c = $('[name=conf]', m).value.trim().toUpperCase(); if (c !== e.id) return toast('Escribe el código exacto: ' + e.id, true);
+        try { await api('borrarEnvio', { id: e.id, confirmar: c }); cerrar(); toast(`${e.id} borrado`); location.hash = tiene('auxiliar') ? '#envios' : '#inicio'; } catch (er) { toast(er.message, true); }
+      };
+    });
+  }
   function modalEditar(e) {
     modal(`<h2>Editar datos</h2>
       <label class="campo"><span>Título</span><input type="text" name="titulo" value="${esc(e.titulo)}"></label>
@@ -502,8 +514,9 @@
       <label class="campo"><span>Rúbrica</span><select name="rubrica"><option value="">Sin elegir</option>${S.rubricas.map(r => `<option value="${r.clave}" ${e.rubrica === r.clave ? 'selected' : ''}>${esc(r.nombre)}</option>`).join('')}</select></label>
       <label class="campo"><span>Autor/a</span><input type="text" name="autorNombre" value="${esc(e.autorNombre)}"></label>
       <label class="campo"><span>Correo del autor</span><input type="email" name="autorCorreo" value="${esc(e.autorCorreo)}"></label>
-      <div class="botones"><button class="btn btn--rojo" data-si>Guardar</button><button class="btn" data-cerrar>Cancelar</button>${e.estado !== 'cerrado' ? '<button class="btn btn--chico" data-cerrar-envio style="margin-left:auto">Cerrar envío</button>' : ''}</div>`, (m, cerrar) => {
+      <div class="botones"><button class="btn btn--rojo" data-si>Guardar</button><button class="btn" data-cerrar>Cancelar</button><span style="margin-left:auto"></span>${e.estado !== 'cerrado' ? '<button class="btn btn--chico" data-cerrar-envio>Cerrar envío</button>' : ''}<button class="btn btn--chico" data-borrar-envio style="color:var(--rojo);border-color:var(--rojo)">Borrar envío</button></div>`, (m, cerrar) => {
       $('[data-si]', m).onclick = async () => { const d = {}; ['titulo', 'genero', 'rubrica', 'autorNombre', 'autorCorreo'].forEach(k => d[k] = $(`[name=${k}]`, m).value); try { await api('editarEnvio', { id: e.id, ...d }); cerrar(); toast('Guardado'); ruta(); } catch (er) { toast(er.message, true); } };
+      const be = $('[data-borrar-envio]', m); if (be) be.onclick = () => { cerrar(); modalBorrarEnvio(e); };
       const ce = $('[data-cerrar-envio]', m); if (ce) ce.onclick = async () => { cerrar(); if (await confirmar('¿Cerrar este envío?', 'Queda archivado y sale de las listas de trabajo.')) { await api('moverEnvio', { envioId: e.id, a: 'cerrar' }); ruta(); } };
     });
   }
