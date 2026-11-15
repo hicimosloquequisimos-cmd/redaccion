@@ -19,16 +19,28 @@
   // =======================================================
   //  MODO DEMOSTRACIÓN (imita al servidor real)
   // =======================================================
-  const CLAVE = 'redaccion-demo-v3';
+  const CLAVE = window.SIMULACRO ? 'redaccion-simulacro-v1' : 'redaccion-demo-v3';
   let db = null;
   const ahora = () => new Date().toISOString();
-  const guardarDB = () => { try { localStorage.setItem(CLAVE, JSON.stringify(db)); } catch (e) { /* sin espacio: solo en memoria */ } };
+  // Almacenamiento de la demo: IndexedDB (admite cientos de MB); si no está disponible, localStorage
+  const IDB = (() => {
+    let base = null;
+    const abrir = () => base || (base = new Promise((ok, mal) => { try { const r = indexedDB.open('redaccion-demo', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); } catch (e) { mal(e); } }));
+    const op = (modo, fn) => abrir().then(d => new Promise((ok, mal) => { const t = d.transaction('kv', modo); const st = t.objectStore('kv'); const r = fn(st); t.oncomplete = () => ok(r && r.result); t.onerror = () => mal(t.error); }));
+    return { leer: k => op('readonly', st => st.get(k)), poner: (k, v) => op('readwrite', st => st.put(v, k)), borrar: k => op('readwrite', st => st.delete(k)) };
+  })();
+  let escribiendo = Promise.resolve();
+  const guardarDB = () => {
+    const copia = JSON.stringify(db);
+    escribiendo = escribiendo.then(() => IDB.poner(CLAVE, copia)).catch(() => { try { localStorage.setItem(CLAVE, copia); } catch (e) { /* sin espacio: solo en memoria */ } });
+  };
   const RUB = { poemas: 'Poesía', cuentos: 'Cuento', microrrelato: 'Microrrelato', cronica: 'Crónica', ensayo: 'Ensayo', formas_hibridas: 'Formas híbridas', fragmento: 'Fragmento de obra mayor', dramaturgia: 'Dramaturgia', cortometraje_performance: 'Cortometraje y performance', historieta_comic: 'Historieta o cómic', narrativa_redes: 'Narrativa para redes', narrativas_digitales: 'Narrativas digitales', obra_sonora_podcast: 'Obra sonora y podcast', videopoema_videoensayo: 'Videopoema y videoensayo' };
-  const ESTADOS = { por_asignar: 'Por asignar', en_evaluacion: 'En evaluación', tercer_evaluador: 'Necesita tercer evaluador', revision_directora: 'Revisión de la Directora', ajustes: 'Aceptado con ajustes · avisar al autor', esperando_autor: 'Esperando versión corregida', devuelto: 'Devuelto por la Directora', aceptado: 'Aceptado · avisar al autor', correcciones_directora: 'Correcciones de la Directora · enviar al autor', aprobado: 'Aprobado · enviar a plataforma', listo_publicar: 'Listo para publicar', publicado: 'Publicado', no_aceptado: 'No aceptado · avisar al autor', cerrado: 'Cerrado (no aceptado)' };
+  const ESTADOS = { por_asignar: 'Por asignar', en_evaluacion: 'En evaluación', tercer_evaluador: 'Necesita tercer evaluador', revision_directora: 'Revisión de la Directora', ajustes: 'Aceptado con ajustes · avisar al autor', esperando_autor: 'Esperando versión corregida', version_recibida: 'Versión corregida recibida · enviar a la Directora', devuelto: 'Devuelto por la Directora', aceptado: 'Aceptado · avisar al autor', correcciones_directora: 'Correcciones de la Directora · enviar al autor', aprobado: 'Aprobado · enviar a plataforma', listo_publicar: 'Listo para publicar', publicado: 'Publicado', no_aceptado: 'No aceptado · avisar al autor', cerrado: 'Cerrado (no aceptado)' };
   const DICT = { aceptada: 'Aceptada', ajustes: 'Aceptada con ajustes', no: 'No aceptada' };
 
   async function semilla() {
     const D = window.Docx;
+    if (window.SIMULACRO) { db = await window.SIMULACRO.semilla(D); guardarDB(); return; }
     const poema = await D.desdeTexto('La orilla que baja\n\nCuando el agua se retira\nla orilla aprende a hablar:\n\n        dice piedra,\n        dice garza,\n        dice lo que el río calló.\n\nMe enseñaron que esto no era poesía.\nYo lo anoto igual,\ncon la boca llena de barro.');
     const cuento = await D.desdeTexto('El planchón de las seis\n\nEl planchón salía a las seis, aunque nadie supiera muy bien de qué reloj. Don Abel lo empujaba con la vara como quien empuja una conversación vieja, y los pasajeros se quedaban callados para no espantar al río.\n\nAquella mañana subió una muchacha con un cuaderno forrado en plástico. No miró la otra orilla: miró el agua, y escribió.\n\n—¿Qué anota? —preguntó Don Abel.\n\n—Lo que usted no dice —contestó ella.');
     const cronica = await D.desdeTexto('Mercado de los sábados\n\nA las cinco de la mañana el mercado ya tiene voz. Primero la de los camiones, después la de las vendedoras que acomodan el bocachico en hielo y, al final, la de los que regatean por costumbre más que por necesidad.');
@@ -86,24 +98,28 @@
 
   async function cargarDemo() {
     if (db) return;
-    try { db = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { db = null; }
+    try { const g = await IDB.leer(CLAVE); db = g ? JSON.parse(g) : null; } catch (e) { db = null; }
+    if (!db) { try { db = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { db = null; } }
     if (!db) await semilla();
   }
   const sesion = t => { const id = db.sesiones[t]; const u = db.usuarios.find(x => x.id === id); if (!u) { const e = new Error('Tu sesión terminó. Vuelve a entrar.'); e.sesion = false; throw e; } return u; };
-  const pub = u => ({ id: u.id, nombre: u.nombre, correo: u.correo, roles: u.roles, activo: u.activo, debeCambiar: u.debeCambiar, avisos: u.avisos });
+  const pub = u => ({ id: u.id, nombre: u.nombre, correo: u.correo, roles: u.roles, activo: u.activo, debeCambiar: u.debeCambiar, avisos: u.avisos, tieneFirma: !!u.firmaId });
   const tiene = (u, r) => u.roles.includes(r);
   const exigir = (u, ...rs) => { if (!rs.some(r => tiene(u, r))) throw new Error('Tu perfil no tiene permiso para esto.'); };
   const hist = (envioId, u, accion, detalle = '') => db.historial.push({ fecha: ahora(), envioId, usuario: u ? u.nombre : 'Sistema', accion, detalle });
   const sigId = (pre, lista) => pre + String(Math.max(0, ...lista.map(x => +(String(x.id).match(/(\d+)$/) || [0, 0])[1])) + 1).padStart(3, '0');
-  const VIS = { directora: ['revision_directora', 'ajustes', 'esperando_autor', 'devuelto', 'correcciones_directora', 'aceptado', 'aprobado', 'listo_publicar', 'publicado'], plataforma: ['listo_publicar', 'publicado'] };
+  const respondio = e => { if (e.estado !== 'esperando_autor') return false; const av = e.avisos || {}; const desde = [av.ajustes, av.directora].filter(Boolean).sort().pop() || ''; const h = db.hilos.find(x => x.hiloId === e.hiloId); return !!h && h.mensajes.some(m => m.fecha > desde && !m.nuestro && m.adjuntos.length); };
+  const textoEstado = e => e.estado === 'revision_directora' && (e.versiones || []).length > 1 ? 'Revisión de la Directora · versión corregida' : ESTADOS[e.estado];
+  const VIS = { directora: ['revision_directora', 'ajustes', 'esperando_autor', 'version_recibida', 'devuelto', 'correcciones_directora', 'aceptado', 'aprobado', 'listo_publicar', 'publicado'], plataforma: ['listo_publicar', 'publicado'] };
   const puedeVer = (e, u) => tiene(u, 'auxiliar') || ['directora', 'plataforma'].some(r => tiene(u, r) && VIS[r].includes(e.estado));
   const notificar = (u, titulo, texto, ruta) => { db.notificaciones = db.notificaciones || []; db.notificaciones.push({ id: 'N' + Date.now() + Math.random().toString(36).slice(2, 5), usuarioId: u.id, fecha: ahora(), titulo, texto: texto || '', ruta: ruta || '', leida: false }); db.enviados.push({ fecha: ahora(), para: u.nombre, texto: titulo, tipo: 'aviso' }); };
   const aviso = (rol, titulo, ruta, texto) => db.usuarios.filter(u => tiene(u, rol) && u.activo).forEach(u => notificar(u, titulo, texto, ruta));
   function envioPara(e, u) {
     const asig = db.asignaciones.filter(a => a.envioId === e.id).map(a => ({ ...a, evaluador: (db.usuarios.find(x => x.id === a.evaluadorId) || {}).nombre }));
-    return { ...e, estadoTexto: ESTADOS[e.estado], asignaciones: !tiene(u, 'auxiliar') && tiene(u, 'directora') ? asig.filter(a => a.estado === 'entregada') : asig, historial: db.historial.filter(h => h.envioId === e.id) };
+    return { ...e, estadoTexto: textoEstado(e), respondio: tiene(u, 'auxiliar') && respondio(e), asignaciones: tiene(u, 'auxiliar') ? asig : tiene(u, 'directora') ? asig.filter(a => a.estado === 'entregada') : [] /* plataforma no ve rúbricas */, historial: db.historial.filter(h => h.envioId === e.id) };
   }
   const versionEn = (e, f) => { const vs = e.versiones.filter(v => !f || new Date(v.fecha) <= new Date(new Date(f).getTime() + 60000)); return (vs.slice(-1)[0] || e.versiones[0] || {}).id || e.textoId; };
+  const CARPETAS = { aceptada: 'Aceptados', ajustes: 'Aceptados con ajustes', no: 'No aceptados' };
   function resolverRonda(e) {
     const asig = db.asignaciones.filter(a => a.envioId === e.id && +a.ronda === +e.ronda);
     if (!asig.length || asig.some(a => a.estado !== 'entregada')) return;
@@ -112,7 +128,7 @@
     else if (d.length === 1 || d[0] === d[1]) r = d[0];
     else if (d.includes('no')) r = 'desacuerdo'; else r = 'ajustes';
     e.estado = { desacuerdo: 'tercer_evaluador', aceptada: 'revision_directora', ajustes: 'ajustes', no: 'no_aceptado' }[r];
-    e.decision = r; e.actualizado = ahora();
+    e.decision = r; e.actualizado = ahora(); if (CARPETAS[r]) e.archivo = CARPETAS[r];
     hist(e.id, null, 'Resultado de la evaluación', r === 'desacuerdo' ? 'Los evaluadores no coinciden' : DICT[r]);
     aviso('auxiliar', `${e.id}: ${ESTADOS[e.estado]}`, 'envio/' + e.id, e.titulo);
     if (r === 'aceptada' || r === 'ajustes') aviso('directora', `${e.id}: ${ESTADOS[e.estado]}`, 'envio/' + e.id, e.titulo);
@@ -123,8 +139,12 @@
     entrar: p => { const u = db.usuarios.find(x => x.id === p.id); if (!u || u.clave !== p.clave) throw new Error('Contraseña incorrecta. (En la demostración, la contraseña de todos es «demo».)'); const t = 'tk' + Math.random().toString(36).slice(2); db.sesiones[t] = u.id; return { token: t, usuario: pub(u) }; },
     salir: p => { delete db.sesiones[p.token]; return {}; },
     yo: (p, u) => ({ usuario: pub(u) }),
+    miFirma: (p, u) => ({ firma: u.firmaId && db.archivos[u.firmaId] ? db.archivos[u.firmaId].b64 : null }),
+    guardarFirma: (p, u) => { exigir(u, 'admin'); const t = db.usuarios.find(x => x.id === p.usuarioId); if (!t) throw new Error('No existe ese perfil.'); if (!p.b64) throw new Error('Falta la imagen.'); if (!/^iVBORw0KGgo/.test(p.b64)) throw new Error('La firma debe ser una imagen PNG.'); const id = 'firma' + t.id + Date.now(); db.archivos[id] = { nombre: `Firma · ${t.nombre}.png`, b64: p.b64 }; t.firmaId = id; return { usuario: pub(t) }; },
+    quitarFirma: (p, u) => { exigir(u, 'admin'); const t = db.usuarios.find(x => x.id === p.usuarioId); if (!t) throw new Error('No existe ese perfil.'); t.firmaId = ''; return { usuario: pub(t) }; },
+    firmaDe: (p, u) => { exigir(u, 'admin'); const t = db.usuarios.find(x => x.id === p.usuarioId); return { firma: t && t.firmaId && db.archivos[t.firmaId] ? db.archivos[t.firmaId].b64 : null }; },
     cambiarClave: (p, u) => { if (u.clave !== p.actual) throw new Error('La contraseña actual no es correcta.'); if (!p.nueva || p.nueva.length < 8) throw new Error('La contraseña nueva debe tener al menos 8 caracteres.'); u.clave = p.nueva; u.debeCambiar = false; return { usuario: pub(u) }; },
-    resumen: (p, u) => { const r = {}; if (tiene(u, 'evaluador')) r.pendientes = db.asignaciones.filter(a => a.evaluadorId === u.id && a.estado !== 'entregada').length; if (tiene(u, 'auxiliar')) r.porHacer = db.envios.filter(e => ['por_asignar', 'tercer_evaluador', 'ajustes', 'devuelto', 'correcciones_directora', 'aceptado', 'aprobado', 'no_aceptado'].includes(e.estado)).length; if (tiene(u, 'directora')) r.porRevisar = db.envios.filter(e => e.estado === 'revision_directora').length; if (tiene(u, 'plataforma')) r.listos = db.envios.filter(e => e.estado === 'listo_publicar').length; return { resumen: r }; },
+    resumen: (p, u) => { const r = {}; if (tiene(u, 'evaluador')) r.pendientes = db.asignaciones.filter(a => a.evaluadorId === u.id && a.estado !== 'entregada').length; if (tiene(u, 'auxiliar')) { r.porHacer = db.envios.filter(e => ['por_asignar', 'tercer_evaluador'].includes(e.estado)).length; r.porHacerEval = db.envios.filter(e => ['ajustes', 'devuelto', 'correcciones_directora', 'aceptado', 'aprobado', 'no_aceptado', 'version_recibida'].includes(e.estado) || respondio(e)).length; } if (tiene(u, 'directora')) r.porRevisar = db.envios.filter(e => e.estado === 'revision_directora').length; if (tiene(u, 'plataforma')) r.listos = db.envios.filter(e => e.estado === 'listo_publicar').length; return { resumen: r }; },
     bandeja: (p, u) => { exigir(u, 'auxiliar'); const doc = n => /\.(docx?|pdf|odt|rtf|txt|pages)$/i.test(n); return { soloDocumentos: !p.todo, hilos: db.hilos.filter(h => p.todo || h.mensajes.some(m => m.adjuntos.some(a => doc(a.nombre)))).slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).map(h => ({ hiloId: h.hiloId, asunto: h.asunto, de: h.de, fecha: h.fecha, fragmento: h.mensajes.slice(-1)[0].cuerpo.slice(0, 180), adjuntos: h.mensajes.flatMap(m => m.adjuntos.map(a => a.nombre)), mensajes: h.mensajes.length, noLeido: h.noLeido, envioId: (db.envios.find(e => e.hiloId === h.hiloId) || {}).id || null })) }; },
     hilo: (p, u) => { exigir(u, 'auxiliar'); const h = db.hilos.find(x => x.hiloId === p.hiloId); h.noLeido = false; return { asunto: h.asunto, envioId: (db.envios.find(e => e.hiloId === h.hiloId) || {}).id || null, mensajes: h.mensajes.map(m => ({ ...m, adjuntos: m.adjuntos.map(a => ({ idx: a.idx, nombre: a.nombre, tam: (db.archivos[a.fid] || {}).b64 ? Math.round(db.archivos[a.fid].b64.length * .75) : 0 })) })) }; },
     adjunto: (p, u) => { exigir(u, 'auxiliar'); const m = db.hilos.flatMap(h => h.mensajes).find(x => x.id === p.mensajeId); const a = m.adjuntos[p.idx]; return { nombre: a.nombre, b64: db.archivos[a.fid].b64 }; },
@@ -149,20 +169,23 @@
     quitarAsignacion: (p, u) => { exigir(u, 'auxiliar'); const a = db.asignaciones.find(x => x.id === p.id); if (a.estado === 'entregada') throw new Error('Esa evaluación ya fue entregada; no se puede quitar.'); db.asignaciones = db.asignaciones.filter(x => x !== a); const e = db.envios.find(x => x.id === a.envioId); if (!db.asignaciones.some(x => x.envioId === e.id && +x.ronda === +e.ronda)) e.estado = 'por_asignar'; hist(e.id, u, 'Evaluador retirado'); return { envio: envioPara(e, u) }; },
     responderAutor: (p, u) => {
       exigir(u, 'auxiliar'); const e = db.envios.find(x => x.id === p.envioId); if (!p.cuerpo) throw new Error('El mensaje está vacío.');
+      p.adjuntos = (p.adjuntos || []).filter(x => x.tipo !== 'rubrica'); // las rúbricas son internas
       db.enviados.push({ fecha: ahora(), para: e.autorCorreo, texto: p.asunto, tipo: 'autor', adjuntos: (p.adjuntos || []).length });
       e.avisos = e.avisos || {}; e.avisos[p.tipo || 'libre'] = ahora();
       if (p.tipo === 'aceptado' && e.estado === 'aceptado') e.estado = 'aprobado';
       if (p.tipo === 'directora' && e.estado === 'correcciones_directora') e.estado = 'esperando_autor';
       if (p.tipo === 'ajustes' && e.estado === 'ajustes') e.estado = 'esperando_autor';
       if (p.tipo === 'no' && e.estado === 'no_aceptado') e.estado = 'cerrado';
+      // Demo: la autora «responde» enseguida con su versión corregida, para poder practicar
+      if (e.estado === 'esperando_autor') { const h = db.hilos.find(x => x.hiloId === e.hiloId); const f0 = db.archivos[e.textoId]; if (h && f0) { const fid = 'vr' + Date.now(); const nom = e.titulo + ' (versión corregida).docx'; db.archivos[fid] = { nombre: nom, b64: f0.b64 }; const t = new Date(Date.now() + 2000).toISOString(); h.mensajes.push({ id: 'mr' + Date.now(), de: h.de, fecha: t, cuerpo: 'Hola, equipo:\n\nGracias por los comentarios. Les envío la versión corregida de mi texto.\n\nUn abrazo.', adjuntos: [{ idx: 0, nombre: nom, fid }] }); h.fecha = t; h.noLeido = true; } }
       e.actualizado = ahora(); hist(e.id, u, 'Correo al autor', (p.tipo || 'libre') + ((p.adjuntos || []).length ? ` · ${p.adjuntos.length} adjunto(s)` : ''));
       return { envio: envioPara(e, u), demo: true };
     },
-    subirVersion: (p, u) => { exigir(u, 'auxiliar'); const e = db.envios.find(x => x.id === p.envioId); const fid = 'v' + Date.now(); db.archivos[fid] = { nombre: p.nombre || 'version.docx', b64: p.b64 }; e.versiones.push({ n: e.versiones.length + 1, id: fid, nombre: p.nombre, fecha: ahora() }); e.textoId = fid; hist(e.id, u, 'Nueva versión del texto', 'Versión ' + e.versiones.length); return { envio: envioPara(e, u) }; },
+    subirVersion: (p, u) => { exigir(u, 'auxiliar'); const e = db.envios.find(x => x.id === p.envioId); const fid = 'v' + Date.now(); db.archivos[fid] = { nombre: p.nombre || 'version.docx', b64: p.b64 }; e.versiones.push({ n: e.versiones.length + 1, id: fid, nombre: p.nombre, fecha: ahora() }); e.textoId = fid; if (e.estado === 'esperando_autor') e.estado = 'version_recibida'; e.actualizado = ahora(); hist(e.id, u, 'Nueva versión del texto', 'Versión ' + e.versiones.length); return { envio: envioPara(e, u) }; },
     moverEnvio: (p, u) => { exigir(u, 'auxiliar'); const e = db.envios.find(x => x.id === p.envioId); if (p.a === 'directora') { e.estado = 'revision_directora'; aviso('directora', `Versión corregida para revisar · ${e.id}`, 'envio/' + e.id, e.titulo); } else if (p.a === 'nueva_ronda') { e.ronda = (+e.ronda || 1) + 1; e.estado = 'por_asignar'; } else if (p.a === 'cerrar') e.estado = 'cerrado'; else if (p.a === 'plataforma' || p.a === 'listo_publicar') { if ((!e.fichaId || !e.licenciaId) && !p.sinFichaOLicencia) throw new Error('Falta la ficha o la licencia del autor. Súbelas o confirma que quieres enviarlo así.'); e.estado = 'listo_publicar'; const v = e.versiones.slice(-1)[0]; aviso('plataforma', `Listo para publicar · ${e.id}`, 'envio/' + e.id, `${e.titulo} · versión final ${v.n}${e.fichaId ? ', ficha' : ''}${e.licenciaId ? ' y licencia' : ''}${p.nota ? ' · ' + p.nota : ''}`); if (p.nota) hist(e.id, u, 'Nota para plataforma', p.nota); } e.actualizado = ahora(); hist(e.id, u, 'Estado cambiado', ESTADOS[e.estado]); return { envio: envioPara(e, u) }; },
     plantillas: (p, u) => { exigir(u, 'auxiliar'); return { plantillas: db.plantillas }; },
     guardarPlantilla: (p, u) => { exigir(u, 'auxiliar'); const t = db.plantillas.find(x => x.clave === p.clave); if (t) Object.assign(t, { asunto: p.asunto, cuerpo: p.cuerpo, nombre: p.nombre || t.nombre }); else db.plantillas.push({ clave: p.clave, nombre: p.nombre, asunto: p.asunto, cuerpo: p.cuerpo }); return { plantillas: db.plantillas }; },
-    envios: (p, u) => { exigir(u, 'auxiliar', 'directora', 'plataforma'); return { envios: db.envios.filter(e => puedeVer(e, u)).map(e => ({ id: e.id, titulo: e.titulo, genero: e.genero, autorNombre: e.autorNombre, estado: e.estado, estadoTexto: ESTADOS[e.estado], creado: e.creado, actualizado: e.actualizado, ronda: e.ronda, evaluadores: db.asignaciones.filter(a => a.envioId === e.id && +a.ronda === +e.ronda).map(a => ({ nombre: db.usuarios.find(x => x.id === a.evaluadorId).nombre, estado: a.estado, dictamen: a.dictamen })) })).sort((a, b) => String(b.actualizado).localeCompare(a.actualizado)) }; },
+    envios: (p, u) => { exigir(u, 'auxiliar', 'directora', 'plataforma'); return { envios: db.envios.filter(e => puedeVer(e, u)).map(e => ({ id: e.id, titulo: e.titulo, genero: e.genero, autorNombre: e.autorNombre, estado: e.estado, estadoTexto: textoEstado(e), respondio: tiene(u, 'auxiliar') && respondio(e), versionN: (e.versiones || []).length, creado: e.creado, actualizado: e.actualizado, ronda: e.ronda, decision: e.decision, archivo: e.archivo || '', corrDir: !!(e.dirCorr && e.dirCorr.fecha && !e.dirCorr.aplicadas), evaluadores: db.asignaciones.filter(a => a.envioId === e.id && +a.ronda === +e.ronda).map(a => ({ nombre: db.usuarios.find(x => x.id === a.evaluadorId).nombre, estado: a.estado, dictamen: a.dictamen, puntaje: a.puntaje, firmada: !!a.firmadaId })) })).sort((a, b) => String(b.actualizado).localeCompare(a.actualizado)) }; },
     envio: (p, u) => { const e = db.envios.find(x => x.id === p.id); if (!e || !puedeVer(e, u)) throw new Error('Tu perfil no puede ver este envío.'); return { envio: envioPara(e, u) }; },
     archivo: (p, u) => {
       let fid;
@@ -180,16 +203,41 @@
       Object.assign(a, { niveles: p.niveles || [], puntaje: p.puntaje, dictamen: p.dictamen, observaciones: p.observaciones || '', anotaciones: p.anotaciones || [], modo: p.modo, enlace: p.enlace || '', estado: 'entregada', entregada: ahora() });
       const e = db.envios.find(x => x.id === a.envioId);
       const gu = (b64, n) => { const id = 'g' + Math.random().toString(36).slice(2); db.archivos[id] = { nombre: n, b64 }; return id; };
+      if (p.rubricaDocx) a.rubricaId = gu(p.rubricaDocx, `${a.envioId} · rúbrica${p.firmadaAuto ? ' FIRMADA' : ''} · ${u.nombre}.docx`);
+      if (p.correccionDocx) a.correccionId = gu(p.correccionDocx, `${a.envioId} · texto corregido · ${u.nombre}.docx`);
+      if (p.firmadaAuto && a.rubricaId) Object.assign(a, { firmadaId: a.rubricaId, firmadaFecha: ahora(), firmadaPor: 'Firma digital guardada en su perfil' });
       if (p.subidaRubrica) a.subidaRubricaId = gu(p.subidaRubrica.b64, p.subidaRubrica.nombre);
       if (p.subidaCorreccion) a.subidaCorreccionId = gu(p.subidaCorreccion.b64, p.subidaCorreccion.nombre);
       hist(e.id, u, 'Evaluación entregada', `${DICT[a.dictamen]} · ${String(a.puntaje).replace('.', ',')}`);
       aviso('auxiliar', `Evaluación entregada · ${e.id}`, 'envio/' + e.id, `${u.nombre}: ${DICT[a.dictamen]} (${String(a.puntaje).replace('.', ',')})`);
       resolverRonda(e); return { asignacion: a };
     },
+    subirFirmada: (p, u) => {
+      const a = db.asignaciones.find(x => x.id === p.asignacionId); if (!a) throw new Error('No existe esa evaluación.');
+      if (a.evaluadorId !== u.id && !tiene(u, 'auxiliar')) throw new Error('Solo quien evaluó o la Auxiliar pueden subir la rúbrica firmada.');
+      if (a.estado !== 'entregada') throw new Error('Primero hay que entregar la evaluación.');
+      const e = db.envios.find(x => x.id === a.envioId); const ev = db.usuarios.find(x => x.id === a.evaluadorId).nombre;
+      const id = 'g' + Math.random().toString(36).slice(2); db.archivos[id] = { nombre: `${e.id} · rúbrica FIRMADA · ${ev}${(String(p.nombre).match(/\.[a-z0-9]+$/i) || ['.pdf'])[0]}`, b64: p.b64 };
+      Object.assign(a, { firmadaId: id, firmadaFecha: ahora(), firmadaPor: u.nombre });
+      hist(e.id, u, 'Rúbrica firmada subida', ev);
+      if (a.evaluadorId === u.id) aviso('auxiliar', `Rúbrica firmada · ${e.id}`, 'envio/' + e.id, `${ev} subió su rúbrica firmada`);
+      return { asignacion: a };
+    },
+    reclasificar: (p, u) => {
+      exigir(u, 'auxiliar'); const e = db.envios.find(x => x.id === p.envioId); if (!e) throw new Error('No existe ese envío.');
+      if (!CARPETAS[p.decision]) throw new Error('Elige el nuevo resultado.');
+      if (['listo_publicar', 'publicado'].includes(e.estado)) throw new Error('Este texto ya está en plataforma: no se puede cambiar su resultado.');
+      if (!String(p.nota || '').trim()) throw new Error('Escribe el motivo del cambio.');
+      const antes = e.decision; e.decision = p.decision; e.archivo = CARPETAS[p.decision];
+      e.estado = { aceptada: 'revision_directora', ajustes: 'ajustes', no: 'no_aceptado' }[p.decision]; e.actualizado = ahora();
+      hist(e.id, u, 'Resultado cambiado', `${DICT[antes] || 'Sin resultado'} → ${DICT[p.decision]} · ${p.nota}`);
+      if (p.decision !== 'no') aviso('directora', `${e.id}: ${ESTADOS[e.estado]}`, 'envio/' + e.id, `La Auxiliar cambió el resultado a «${DICT[p.decision]}»: ${p.nota}`);
+      return { envio: envioPara(e, u) };
+    },
     borradorDirectora: (p, u) => { exigir(u, 'directora'); const e = db.envios.find(x => x.id === p.envioId); e.dirCorr = e.dirCorr || {}; e.dirCorr.borrador = { anotaciones: p.anotaciones || [], nota: p.nota || '', version: e.versiones.slice(-1)[0].n }; return { guardado: ahora() }; },
     borrarEnvio: (p, u) => { exigir(u, 'auxiliar', 'admin'); const e = db.envios.find(x => x.id === p.id); if (!e) throw new Error('No existe ese envío.'); if (String(p.confirmar || '').trim().toUpperCase() !== e.id) throw new Error('Escribe el código del envío para confirmar.'); const ids = db.asignaciones.filter(x => x.envioId === e.id).map(x => x.id); db.asignaciones = db.asignaciones.filter(x => x.envioId !== e.id); db.historial = db.historial.filter(h => h.envioId !== e.id); db.notificaciones = (db.notificaciones || []).filter(n => n.ruta !== 'envio/' + e.id && !ids.some(id => n.ruta === 'evaluacion/' + id)); db.envios = db.envios.filter(x => x !== e); const h = db.hilos.find(x => x.envioId === e.id); if (h) h.envioId = null; return { borrado: e.id }; },
-    decidir: (p, u) => { exigir(u, 'directora'); const e = db.envios.find(x => x.id === p.envioId); if (p.decision === 'corregir') { if (!(p.anotaciones || []).length && !p.nota) throw new Error('Haz al menos una corrección o escribe una nota.'); let archivoId = ''; if (p.correccionDocx) { archivoId = 'd' + Date.now(); db.archivos[archivoId] = { nombre: `${e.id} · correcciones de la Dirección.docx`, b64: p.correccionDocx }; } e.dirCorr = { version: e.versiones.slice(-1)[0].n, anotaciones: p.anotaciones || [], nota: p.nota || '', archivoId, fecha: ahora() }; e.estado = 'correcciones_directora'; hist(e.id, u, 'Correcciones de la Directora', `${(p.anotaciones || []).length} corrección(es)${p.nota ? ' · ' + p.nota : ''}`); aviso('auxiliar', `Correcciones de la Directora · ${e.id}`, 'envio/' + e.id, 'Envíaselas al autor para que las revise.'); e.actualizado = ahora(); return { envio: envioPara(e, u) }; } if (p.decision === 'confirmar') { e.estado = 'aceptado'; hist(e.id, u, 'Aceptación confirmada', p.nota || ''); } else { e.estado = 'devuelto'; e.nota = p.nota || ''; hist(e.id, u, 'Devuelto a la Auxiliar', p.nota || ''); } aviso('auxiliar', `${p.decision === 'confirmar' ? 'La Directora confirmó' : 'La Directora devolvió'} · ${e.id}`, 'envio/' + e.id, p.nota || e.titulo); e.actualizado = ahora(); return { envio: envioPara(e, u) }; },
-    marcarPublicado: (p, u) => { exigir(u, 'plataforma'); const e = db.envios.find(x => x.id === p.envioId); e.estado = 'publicado'; e.publicadoUrl = p.url || ''; hist(e.id, u, 'Publicado en la gaceta', p.url || ''); aviso('auxiliar', `Publicado · ${e.id}`, 'envio/' + e.id, e.titulo); return { envio: envioPara(e, u) }; },
+    decidir: (p, u) => { exigir(u, 'directora'); const e = db.envios.find(x => x.id === p.envioId); if (p.decision === 'corregirAprobar') { if (!(p.anotaciones || []).length) throw new Error('Haz al menos una corrección (o usa «Aprobar para publicar»).'); const v = e.versiones.slice(-1)[0]; let archivoId = ''; if (p.correccionDocx) { archivoId = 'd' + Date.now(); db.archivos[archivoId] = { nombre: `${e.id} · correcciones de la Dirección.docx`, b64: p.correccionDocx }; } if (p.finalDocx) { const fid = 'fin' + Date.now(); db.archivos[fid] = { nombre: `${e.id} · texto FINAL con correcciones de la Dirección.docx`, b64: p.finalDocx }; e.versiones.push({ n: v.n + 1, id: fid, nombre: 'Texto final con correcciones de la Dirección.docx', fecha: ahora(), deDirectora: true }); e.textoId = fid; } e.dirCorr = { version: v.n, anotaciones: p.anotaciones || [], nota: p.nota || '', archivoId, fecha: ahora(), aplicadas: true }; e.estado = 'aceptado'; hist(e.id, u, 'Aprobada con correcciones de la Directora', `${p.anotaciones.length} corrección(es) aplicadas${p.nota ? ' · ' + p.nota : ''}`); aviso('auxiliar', `Aprobada con correcciones de la Directora · ${e.id}`, 'envio/' + e.id, 'Avísale a la autora y envíala a plataforma: el texto final ya tiene las correcciones.'); e.actualizado = ahora(); return { envio: envioPara(e, u) }; } if (p.decision === 'corregir') { if (!(p.anotaciones || []).length && !p.nota) throw new Error('Haz al menos una corrección o escribe una nota.'); let archivoId = ''; if (p.correccionDocx) { archivoId = 'd' + Date.now(); db.archivos[archivoId] = { nombre: `${e.id} · correcciones de la Dirección.docx`, b64: p.correccionDocx }; } e.dirCorr = { version: e.versiones.slice(-1)[0].n, anotaciones: p.anotaciones || [], nota: p.nota || '', archivoId, fecha: ahora() }; e.estado = 'correcciones_directora'; hist(e.id, u, 'Correcciones de la Directora', `${(p.anotaciones || []).length} corrección(es)${p.nota ? ' · ' + p.nota : ''}`); aviso('auxiliar', `Correcciones de la Directora · ${e.id}`, 'envio/' + e.id, 'Envíaselas al autor para que las revise.'); e.actualizado = ahora(); return { envio: envioPara(e, u) }; } if (p.decision === 'confirmar') { e.estado = 'aceptado'; hist(e.id, u, 'Aceptación confirmada', p.nota || ''); } else { e.estado = 'devuelto'; e.nota = p.nota || ''; hist(e.id, u, 'Devuelto a la Auxiliar', p.nota || ''); } aviso('auxiliar', `${p.decision === 'confirmar' ? 'La Directora confirmó' : 'La Directora devolvió'} · ${e.id}`, 'envio/' + e.id, p.nota || e.titulo); e.actualizado = ahora(); return { envio: envioPara(e, u) }; },
+    marcarPublicado: (p, u) => { exigir(u, 'plataforma'); const e = db.envios.find(x => x.id === p.envioId); e.estado = 'publicado'; e.publicadoUrl = p.url || ''; e.archivo = 'Publicados'; hist(e.id, u, 'Publicado en la gaceta', p.url || ''); aviso('auxiliar', `Publicado · ${e.id}`, 'envio/' + e.id, e.titulo); return { envio: envioPara(e, u) }; },
     usuarios: (p, u) => { exigir(u, 'admin'); return { usuarios: db.usuarios.map(pub) }; },
     guardarUsuario: (p, u) => {
       exigir(u, 'admin'); const d = p.usuario; if (!d.nombre) throw new Error('Falta el nombre.'); if (!(d.roles || []).length) throw new Error('Elige al menos un perfil.');
@@ -221,7 +269,8 @@
   window.API = {
     demo: DEMO,
     llamar: DEMO ? llamarDemo : llamarServidor,
-    reiniciarDemo: async () => { try { localStorage.removeItem(CLAVE); } catch (e) { } db = null; await cargarDemo(); },
+    reiniciarDemo: async () => { await escribiendo; try { await IDB.borrar(CLAVE); } catch (e) { } try { localStorage.removeItem(CLAVE); } catch (e) { } db = null; await cargarDemo(); await escribiendo; },
+    esperarGuardado: () => escribiendo,
     enviadosDemo: () => (db ? db.enviados.slice().reverse() : []),
   };
 })();

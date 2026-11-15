@@ -74,7 +74,7 @@
   // ---------- Estructura general ----------
   function pestanas() {
     const t = [['inicio', 'Inicio']];
-    if (tiene('auxiliar')) t.push(['bandeja', 'Correo'], ['envios', 'Envíos', S.resumen.porHacer], ['plantillas', 'Mensajes']);
+    if (tiene('auxiliar')) t.push(['bandeja', 'Correo'], ['envios', 'Envíos', S.resumen.porHacer], ['evaluados', 'Textos evaluados', S.resumen.porHacerEval], ['plantillas', 'Mensajes']);
     if (tiene('evaluador')) t.push(['evaluaciones', 'Mis evaluaciones', S.resumen.pendientes]);
     if (tiene('directora')) t.push(['revisar', 'Para revisar', S.resumen.porRevisar]);
     if (tiene('plataforma')) t.push(['publicar', 'Listos para publicar', S.resumen.listos]);
@@ -188,8 +188,17 @@
         <label class="campo"><span>Contraseña nueva (mínimo 8 caracteres)</span><input type="password" name="nueva" required minlength="8" autocomplete="new-password"></label>
         <label class="campo"><span>Repite la contraseña nueva</span><input type="password" name="otra" required minlength="8" autocomplete="new-password"></label>
         <button class="btn btn--rojo">Guardar contraseña</button>
-      </form></div>`,
+      </form>
+      ${tiene('evaluador') && !S.usuario.debeCambiar ? `<h2 style="margin-top:2rem">Mi firma</h2><div class="tarjeta" id="mi-firma"><p class="suave">Cargando…</p></div>` : ''}</div>`,
     conectar: () => {
+      const caja = $('#mi-firma');
+      const pintarFirma = async () => {
+        if (!caja) return;
+        let f = null; try { f = (await api('miFirma')).firma; } catch (e) { }
+        caja.innerHTML = `<p class="suave">Cuando entregas una evaluación, tu firma <b>se pone sola en tu rúbrica</b> y queda firmada, sin imprimir ni escanear. La carga Sebastian o Luisa en «Perfiles».</p>
+          ${f ? `<div class="firma-vista"><img src="data:image/png;base64,${f}" alt="Tu firma"></div>` : '<div class="vacio" style="padding:1rem">Todavía no tienes firma guardada. Envíale a Sebastian o a Luisa una foto de tu firma (en hoja blanca) para que la carguen.</div>'}`;
+      };
+      pintarFirma();
       $('#f-clave').onsubmit = async e => {
         e.preventDefault(); const f = new FormData(e.target);
         if (f.get('nueva') !== f.get('otra')) return toast('Las contraseñas nuevas no coinciden.', true);
@@ -204,7 +213,7 @@
     render: async () => {
       await actualizarNotificaciones();
       const r = S.resumen; const tarj = [];
-      if (tiene('auxiliar')) tarj.push(['#envios', r.porHacer, 'Envíos que necesitan algo de ti'], ['#bandeja', '✉', 'Revisar el correo de la gaceta']);
+      if (tiene('auxiliar')) tarj.push(['#envios', r.porHacer, 'Envíos por asignar'], ['#evaluados', r.porHacerEval, 'Textos evaluados que necesitan algo de ti'], ['#bandeja', '✉', 'Revisar el correo de la gaceta']);
       if (tiene('evaluador')) tarj.push(['#evaluaciones', r.pendientes, 'Evaluaciones pendientes']);
       if (tiene('directora')) tarj.push(['#revisar', r.porRevisar, 'Obras para revisar']);
       if (tiene('plataforma')) tarj.push(['#publicar', r.listos, 'Listas para publicar']);
@@ -264,7 +273,7 @@
           <label class="campo"><span>Título de la obra</span><input type="text" name="titulo" required value="${esc(tituloAsunto)}"></label>
           <label class="campo"><span>Género o formato</span><input type="text" name="genero" list="generos" value="${esc(generoAsunto)}"><datalist id="generos">${GENEROS.map(g => `<option>${g}</option>`).join('')}</datalist></label>
           <label class="campo"><span>Rúbrica sugerida</span><select name="rubrica"><option value="">Elegir después</option>${S.rubricas.map(r => `<option value="${r.clave}" ${rubricaDeGenero(generoAsunto) === r.clave ? 'selected' : ''}>${esc(r.nombre)}</option>`).join('')}</select></label>
-          <label class="campo"><span>Nombre del autor (solo lo ven Auxiliar, Directora y Plataforma)</span><input type="text" name="autorNombre" value="${esc(nombre)}"></label>
+          <label class="campo"><span>Nombre del autor (solo lo ven Auxiliar, Directora y Plataforma). Si tiene seudónimo: «Nombre (firma: Seudónimo)»; la carpeta en Drive usa el seudónimo.</span><input type="text" name="autorNombre" value="${esc(nombre)}"></label>
           <label class="campo"><span>Correo del autor</span><input type="email" name="autorCorreo" value="${esc(correo)}"></label>
           <label class="chequeo"><input type="checkbox" name="avisar" checked> Enviarle al autor el mensaje de «Recibido»</label></div>
           <button class="btn btn--rojo" style="width:100%;margin-top:.8rem">Registrar envío</button></form>`
@@ -301,15 +310,26 @@
       };
     },
   };
-  const rellenar = (t, e) => String(t || '').replace(/\{titulo\}/g, e.titulo || '').replace(/\{autor\}/g, (e.autorNombre || '').split('(')[0].trim()).replace(/\{codigo\}/g, e.id || '');
+  const rellenar = (t, e, obs) => String(t || '').replace(/\{titulo\}/g, e.titulo || '').replace(/\{autor\}/g, (e.autorNombre || '').split('(')[0].trim()).replace(/\{codigo\}/g, e.id || '').replace(/\{observaciones\}/g, obs || '');
+  // Comentarios de los evaluadores para la autora, sin nombres (las rúbricas y los puntajes no se envían)
+  const observacionesPara = e => (e.asignaciones || []).filter(a => a.estado === 'entregada' && +a.ronda === +e.ronda && String(a.observaciones || '').trim())
+    .map((a, i) => `Lector/a ${i + 1}: ${String(a.observaciones).trim()}`).join('\n\n');
+  // Si el mensaje de «No aceptado» o «Con ajustes» no trae {observaciones}, se agregan antes de la despedida
+  function conObservaciones(cuerpo, tipo, obs) {
+    if (!obs || !['no', 'ajustes'].includes(tipo) || /\{observaciones\}/.test(cuerpo)) return cuerpo;
+    const bloque = `Estos son los comentarios de quienes leyeron tu texto:\n\n${obs}`;
+    const i = cuerpo.search(/\n\s*(Un abrazo|Saludos|Cordialmente)/i);
+    return i > -1 ? cuerpo.slice(0, i) + '\n\n' + bloque + cuerpo.slice(i) : cuerpo + '\n\n' + bloque;
+  }
 
   // =========================================================
   //  ENVÍOS (Auxiliar, Directora, Plataforma)
   // =========================================================
+  // «Envíos»: textos registrados desde el correo que están entrando a evaluación o evaluándose
   const GRUPOS_AUX = [
-    ['Necesitan algo de ti', ['por_asignar', 'tercer_evaluador', 'ajustes', 'devuelto', 'aceptado', 'no_aceptado']],
-    ['En evaluación', ['en_evaluacion']], ['Con la Directora', ['revision_directora']], ['Esperando al autor', ['esperando_autor']],
-    ['Listos y publicados', ['listo_publicar', 'publicado']], ['Cerrados', ['cerrado']],
+    ['Por asignar evaluadores', ['por_asignar']],
+    ['Necesitan tercer evaluador', ['tercer_evaluador']],
+    ['En evaluación', ['en_evaluacion']],
   ];
   function filaEnvio(e) {
     return `<li><a class="fila" href="#envio/${esc(e.id)}"><div class="fila__cuerpo"><div class="meta">${esc(e.id)} · ${esc(e.genero || 'sin género')} · ${hace(e.actualizado || e.creado)}</div>
@@ -320,9 +340,53 @@
     render: async () => {
       const { envios } = await api('envios');
       return `<div class="cabecera"><div><p class="meta">Todos los envíos</p><h1>Envíos</h1></div><a class="btn btn--chico" href="#bandeja">Ir al correo</a></div>
-        ${GRUPOS_AUX.map(([t, est]) => { const l = envios.filter(e => est.includes(e.estado)); return l.length ? `<h2 style="margin-top:1.4rem">${t} <span class="meta">${l.length}</span></h2><ul class="lista">${l.map(filaEnvio).join('')}</ul>` : ''; }).join('') || '<div class="vacio"><span class="mano">Sin envíos todavía</span>Regístralos desde el correo.</div>'}`;
+        <p class="suave" style="margin:-.4rem 0 1rem">Los textos que registraste desde el correo y están en evaluación. Cuando los evaluadores entregan, pasan a <a href="#evaluados">Textos evaluados</a>.</p>
+        ${GRUPOS_AUX.map(([t, est]) => { const l = envios.filter(e => est.includes(e.estado)); return l.length ? `<h2 style="margin-top:1.4rem">${t} <span class="meta">${l.length}</span></h2><ul class="lista">${l.map(filaEnvio).join('')}</ul>` : ''; }).join('') || `<div class="vacio"><span class="mano">Nada en evaluación</span>Registra los envíos nuevos desde el <a href="#bandeja">Correo</a>.${envios.length ? ' Los que ya tienen resultado están en <a href="#evaluados">Textos evaluados</a>.' : ''}</div>`}`;
     },
   };
+  // ---------- Textos evaluados (Auxiliar): resultado de la evaluación ----------
+  const RESULTADOS = [
+    ['aceptada', 'Aceptados', 'd-aceptada'],
+    ['ajustes', 'Aceptados con ajustes', 'd-ajustes'],
+    ['dircorr', 'Correcciones de la Directora', 'd-ajustes'],
+    ['aprobado', 'Aprobados para publicar', 'd-aceptada'],
+    ['no', 'No aceptados', 'd-no'],
+    ['publicado', 'Publicados', 'd-aceptada'],
+  ];
+  // Los publicados pasan a «Publicados»; los que están con correcciones de la Directora (por enviar o esperando a la autora), a su propia casilla
+  const TE_TOCA = ['ajustes', 'devuelto', 'correcciones_directora', 'aceptado', 'aprobado', 'no_aceptado', 'version_recibida'];
+  const teToca = e => TE_TOCA.includes(e.estado) || !!e.respondio;
+  const chipRes = e => grupoDe(e) === 'aprobado' ? '<span class="dict d-aceptada">✓ Aprobado por la Directora</span>' : dictChip(e.decision);
+  const chipResp = e => e.respondio ? '<span class="estado" style="border-color:var(--buchon);color:var(--buchon)">📩 Respondió con nueva versión</span>' : '';
+  const grupoDe = e => e.estado === 'publicado' ? 'publicado'
+    : ['aceptado', 'aprobado', 'listo_publicar'].includes(e.estado) ? 'aprobado'
+    : (e.estado === 'correcciones_directora' || (['esperando_autor', 'version_recibida'].includes(e.estado) && e.corrDir)) ? 'dircorr' : e.decision;
+  RUTAS.evaluados = {
+    render: async () => {
+      const { envios } = await api('envios');
+      const con = envios.filter(e => RESULTADOS.some(r => r[0] === grupoDe(e)));
+      let filtro = 'todos'; try { filtro = localStorage.getItem('redaccion-evaluados') || 'todos'; } catch (e) { }
+      if (!['todos', ...RESULTADOS.map(r => r[0])].includes(filtro)) filtro = 'todos';
+      const cuenta = k => con.filter(e => grupoDe(e) === k).length;
+      const fila = e => `<li><a class="fila ${teToca(e) ? 'nuevo' : ''}" href="#envio/${esc(e.id)}"><div class="fila__cuerpo"><div class="meta">${esc(e.id)} · ${esc(e.genero || 'sin género')} · ${fecha(e.actualizado || e.creado)}</div>
+        <div class="fila__titulo">${esc(e.titulo)}</div>
+        <div class="fila__sub">${(e.evaluadores || []).filter(v => v.estado === 'entregada').map(v => `${esc(v.nombre)}: ${punt(v.puntaje)} · ${esc(DICT[v.dictamen] || '')} ${v.firmada ? '✍✓' : '✍✗'}`).join(' — ')}</div>
+        <div class="meta" style="margin-top:.3rem">${(() => { const ev = (e.evaluadores || []).filter(v => v.estado === 'entregada'); const f = ev.filter(v => v.firmada).length; return `Rúbricas firmadas: ${f}/${ev.length}${f < ev.length ? ' ⚠' : ' ✓'}`; })()}${e.archivo ? ` · 📁 Archivo › ${esc(e.archivo)}` : ''}${grupoDe(e) === 'aprobado' && e.decision && e.decision !== 'aceptada' ? ` · Venía de: ${esc(DICT[e.decision] || e.decision)}${e.versionN > 1 ? ` (versión corregida ${e.versionN})` : ''}` : ''}</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.35rem">${teToca(e) ? '<span class="estado" style="background:var(--canaguate);color:#1b1b1b;border-color:var(--canaguate)">Te toca</span>' : ''}${chipResp(e)}${chipRes(e)}${estadoChip(e.estado, e.estadoTexto)}${['listo_publicar', 'publicado'].includes(e.estado) ? '' : `<button type="button" class="btn btn--chico" data-mover-res="${esc(e.id)}">Mover a…</button>`}</div></a></li>`;
+      S._evaluados = con;
+      return `<div class="cabecera"><div><p class="meta">Resultado de la evaluación</p><h1>Textos evaluados</h1><p class="suave">Los textos que ya pasaron por los evaluadores, según su resultado. Los que tienen correcciones de la Directora en curso van en su propia casilla; cuando la Directora aprueba un texto (venga de aceptado, de ajustes o de sus correcciones) pasa a «Aprobados para publicar», y cuando se publica, a «Publicados». La segunda etiqueta muestra en qué va cada uno ahora.</p></div></div>
+        ${con.some(e => teToca(e)) ? `<div class="tarjeta" style="border-color:var(--canaguate)"><b>Te toca:</b> ${con.filter(e => teToca(e)).map(e => `<a href="#envio/${esc(e.id)}">${esc(e.id)} · ${esc(e.titulo)}</a> <span class="meta">(${esc(e.respondio ? 'la autora respondió con una versión nueva' : e.estadoTexto)})</span>`).join(' · ')}</div>` : ''}
+        <div class="rejilla" style="margin:1rem 0 1.4rem">${RESULTADOS.map(([k, t]) => `<button type="button" class="cifra-g" data-res="${k}" style="text-align:left;cursor:pointer;${filtro === k ? 'border-color:var(--acento);background:rgba(91,141,239,.12)' : ''}"><span class="meta">${t}</span><b>${cuenta(k)}</b></button>`).join('')}</div>
+        <div class="modo" role="group" aria-label="Filtrar" style="margin-bottom:1.2rem"><button data-res="todos" aria-pressed="${filtro === 'todos'}">Todos (${con.length})</button>${RESULTADOS.map(([k, t]) => `<button data-res="${k}" aria-pressed="${filtro === k}">${t}</button>`).join('')}</div>
+        ${con.length ? RESULTADOS.filter(([k]) => filtro === 'todos' || filtro === k).map(([k, t]) => { const l = con.filter(e => grupoDe(e) === k).sort((x, y) => (teToca(y) ? 1 : 0) - (teToca(x) ? 1 : 0)); return `<h2 style="margin-top:1.2rem">${t} <span class="meta">${l.length}</span></h2>${l.length ? `<ul class="lista">${l.map(fila).join('')}</ul>` : '<div class="vacio" style="padding:1.2rem">Ninguno por ahora.</div>'}`; }).join('')
+          : '<div class="vacio"><span class="mano">Aún no hay textos evaluados</span>Aquí aparecen cuando los evaluadores entregan sus rúbricas.</div>'}`;
+    },
+    conectar: () => {
+      $$('[data-res]').forEach(b => b.onclick = () => { try { localStorage.setItem('redaccion-evaluados', b.dataset.res); } catch (e) { } ruta(); });
+      $$('[data-mover-res]').forEach(b => b.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); modalReclasificar(S._evaluados.find(x => x.id === b.dataset.moverRes)); });
+    },
+  };
+
   RUTAS.revisar = {
     render: async () => {
       const { envios } = await api('envios');
@@ -356,28 +420,32 @@
         const tipoAviso = { ajustes: 'ajustes', aceptado: 'aceptado', no_aceptado: 'no', correcciones_directora: 'directora' }[e.estado];
         if (e.estado === 'aprobado') acciones.push('<button class="btn btn--verde" data-plataforma>Enviar a plataforma</button>');
         acciones.push(`<button class="btn ${tipoAviso ? 'btn--ama' : ''}" data-escribir="${tipoAviso || ''}">${tipoAviso ? 'Avisar al autor' : 'Escribir al autor'}</button>`);
-        if (['esperando_autor', 'ajustes', 'devuelto'].includes(e.estado)) acciones.push('<button class="btn" data-subir-version>Subir versión corregida</button>');
-        if (['esperando_autor', 'devuelto'].includes(e.estado)) acciones.push('<button class="btn btn--claro" data-mover="directora">Enviar a la Directora</button><button class="btn" data-mover="nueva_ronda">Nueva ronda de evaluación</button>');
+        if (['esperando_autor', 'ajustes', 'devuelto', 'version_recibida'].includes(e.estado)) acciones.push(`<button class="btn" data-subir-version>${e.estado === 'version_recibida' ? 'Subir otra versión' : 'Subir versión corregida'}</button>`);
+        if (['esperando_autor', 'devuelto', 'version_recibida'].includes(e.estado)) acciones.push('<button class="btn btn--claro" data-mover="directora">Enviar a la Directora</button><button class="btn" data-mover="nueva_ronda">Nueva ronda de evaluación</button>');
+        if (['aceptada', 'ajustes', 'no'].includes(e.decision) && !['listo_publicar', 'publicado'].includes(e.estado)) acciones.push('<button class="btn btn--chico" data-cambiar-res>Cambiar resultado</button>');
         acciones.push('<button class="btn btn--chico" data-editar>Editar datos</button>');
       }
       if (dir && e.estado === 'revision_directora') acciones.push(`<button class="btn btn--verde" data-decidir="confirmar">Aprobar para publicar</button><a class="btn btn--rojo" href="#corregir/${esc(e.id)}">Hacer correcciones${e.dirCorr && e.dirCorr.borrador && e.dirCorr.borrador.anotaciones.length ? ' (borrador)' : ''}</a><button class="btn" data-decidir="devolver">Devolver a la Auxiliar</button>`);
       if (tiene('admin') && !aux) acciones.push('<button class="btn btn--chico" data-borrar-admin style="color:var(--rojo);border-color:var(--rojo);margin-left:auto">Borrar envío</button>');
       if (pla && e.estado === 'listo_publicar') acciones.push('<button class="btn btn--verde" data-publicado>Marcar como publicada</button>');
       const r = rubrica(e.rubrica);
-      return `<div class="migas"><a href="#${aux ? 'envios' : dir ? 'revisar' : 'publicar'}">${aux ? 'Envíos' : dir ? 'Para revisar' : 'Listos para publicar'}</a> › ${esc(e.id)}</div>
+      return `<div class="migas"><a href="#${aux ? (DICT[e.decision] ? 'evaluados' : 'envios') : dir ? 'revisar' : 'publicar'}">${aux ? (DICT[e.decision] ? 'Textos evaluados' : 'Envíos') : dir ? 'Para revisar' : 'Listos para publicar'}</a> › ${esc(e.id)}</div>
       <div class="cabecera"><div><p class="meta">${esc(e.id)} · ${esc(e.genero || 'sin género')}${e.ronda > 1 ? ` · ronda ${e.ronda}` : ''}</p><h1>${esc(e.titulo)}</h1>${estadoChip(e.estado, e.estadoTexto)}</div></div>
       ${e.nota && e.estado === 'devuelto' ? `<div class="tarjeta" style="border-color:var(--canaguate)"><p class="meta">Nota de la Directora</p><p style="margin:0">${esc(e.nota)}</p></div>` : ''}
+      ${aux && e.respondio ? `<div class="tarjeta" style="border-color:var(--buchon)"><b>📩 La autora respondió con un documento.</b> Ábrelo en el correo y pulsa <b>Usar como versión</b>; después, <b>Enviar a la Directora</b>.<div class="botones" style="margin-top:.6rem"><a class="btn btn--verde" href="#hilo/${encodeURIComponent(e.hiloId)}">Abrir el correo</a></div></div>` : ''}
+      ${aux && e.estado === 'version_recibida' ? `<div class="tarjeta" style="border-color:var(--buchon)"><b>✓ Versión corregida guardada (versión ${(e.versiones || []).length}).</b> Revísala en «Archivos» y pulsa <b>Enviar a la Directora</b> para que la apruebe.</div>` : ''}
+      ${dir && e.estado === 'revision_directora' && (e.versiones || []).length > 1 ? `<div class="tarjeta" style="border-color:var(--acento)"><b>Esta es la versión corregida</b> (versión ${(e.versiones || []).length}) que mandó la autora después de ${e.dirCorr && e.dirCorr.fecha ? 'tus correcciones' : 'los ajustes de los evaluadores'}. Si está bien, pulsa <b>Aprobar para publicar</b>: pasará a «Aprobados para publicar» y la Auxiliar la enviará a plataforma. Las versiones anteriores siguen en «Archivos».</div>` : ''}
       ${acciones.length ? `<div class="botones" style="margin-bottom:1.4rem">${acciones.join('')}</div>` : ''}
       <div class="dos"><div>
-        ${e.dirCorr && e.dirCorr.fecha ? `<div class="tarjeta" style="border-color:var(--acento)"><p class="meta">Correcciones de la Directora · versión ${e.dirCorr.version} · ${fecha(e.dirCorr.fecha)}</p>${e.dirCorr.nota ? `<p style="white-space:pre-wrap">${esc(e.dirCorr.nota)}</p>` : ''}<div class="botones">${e.dirCorr.anotaciones.length ? `<button class="btn btn--chico btn--claro" data-ver-dir>Ver correcciones (${e.dirCorr.anotaciones.length})</button>` : ''}${e.dirCorr.archivoId ? '<button class="btn btn--chico" data-archivo="directora">Texto corregido en Word</button>' : ''}</div></div>` : ''}
-        <h2>Evaluaciones</h2>
-        ${entregadas.length ? `<div class="lado-a-lado">${entregadas.map((a, i) => tarjetaEvaluacion(a, i)).join('')}</div>` : '<div class="vacio">Todavía no hay evaluaciones entregadas.</div>'}
+        ${e.dirCorr && e.dirCorr.fecha ? `<div class="tarjeta" style="border-color:var(--acento)"><p class="meta">Correcciones de la Directora · versión ${e.dirCorr.version} · ${fecha(e.dirCorr.fecha)}</p>${e.dirCorr.aplicadas ? '<p style="margin:.2rem 0 .5rem"><b>✓ Aplicadas en el texto final</b> (la última versión en «Archivos»).</p>' : ''}${e.dirCorr.nota ? `<p style="white-space:pre-wrap">${esc(e.dirCorr.nota)}</p>` : ''}<div class="botones">${e.dirCorr.anotaciones.length ? `<button class="btn btn--chico btn--claro" data-ver-dir>Ver correcciones (${e.dirCorr.anotaciones.length})</button>` : ''}${e.dirCorr.archivoId ? '<button class="btn btn--chico" data-archivo="directora">Texto corregido en Word</button>' : ''}</div></div>` : ''}
+        ${!aux && !dir ? '' : `<h2>Evaluaciones</h2>`}
+        ${!aux && !dir ? '' : entregadas.length ? `<div class="lado-a-lado">${entregadas.map((a, i) => tarjetaEvaluacion(a, i)).join('')}</div>` : '<div class="vacio">Todavía no hay evaluaciones entregadas.</div>'}
         ${aux && ronda.some(a => a.estado !== 'entregada') ? `<h3 style="margin-top:1.4rem">Pendientes</h3>${ronda.filter(a => a.estado !== 'entregada').map(a => `<div class="archivo"><span>${esc(a.evaluador)} · asignada ${hace(a.asignada)}${dias(a.asignada) >= 7 ? ' ⚠' : ''} · ${a.estado === 'borrador' ? 'ya empezó' : 'sin empezar'}</span><button class="btn btn--chico" data-quitar="${esc(a.id)}">Quitar</button></div>`).join('')}` : ''}
       </div><div>
         <div class="tarjeta"><h3>Datos</h3><dl class="datos">
           <dt>Código</dt><dd>${esc(e.id)}</dd><dt>Rúbrica</dt><dd>${esc(r ? r.nombre : 'Sin elegir')}</dd>
           ${aux || dir || pla ? `<dt>Autor/a</dt><dd>${esc(e.autorNombre || '—')}</dd><dt>Correo</dt><dd>${esc(e.autorCorreo || '—')}</dd>` : ''}
-          <dt>Recibido</dt><dd>${fecha(e.creado)}</dd>${e.publicadoUrl ? `<dt>Publicado</dt><dd><a href="${esc(e.publicadoUrl)}" target="_blank" rel="noopener">${esc(e.publicadoUrl)}</a></dd>` : ''}
+          <dt>Recibido</dt><dd>${fecha(e.creado)}</dd>${e.decision && DICT[e.decision] ? `<dt>Resultado</dt><dd>${dictChip(e.decision)}</dd>` : ''}${e.archivo ? `<dt>Carpeta</dt><dd>Archivo › ${esc(e.archivo)}</dd>` : ''}${e.carpetaUrl ? `<dt>Drive</dt><dd><a href="${esc(e.carpetaUrl)}" target="_blank" rel="noopener">Abrir la carpeta del envío ↗</a></dd>` : ''}${e.publicadoUrl ? `<dt>Publicado</dt><dd><a href="${esc(e.publicadoUrl)}" target="_blank" rel="noopener">${esc(e.publicadoUrl)}</a></dd>` : ''}
         </dl></div>
         <div class="tarjeta"><h3>Archivos</h3>
           ${(e.versiones || []).map(v => `<div class="archivo"><span>${(['listo_publicar', 'publicado', 'aprobado'].includes(e.estado) && v.n === e.versiones.length ? '<b>Texto final</b> · ' : '') + (e.versiones.length > 1 ? `Versión ${v.n} · ` : 'Obra · ')}${esc(v.nombre)}</span><button class="btn btn--chico" data-archivo="version|${v.n}">Descargar</button></div>`).join('')}
@@ -408,6 +476,10 @@
         });
       });
       const ba = $('[data-borrar-admin]'); if (ba) ba.onclick = () => modalBorrarEnvio(e);
+      $$('[data-rub-completa]').forEach(b => b.onclick = () => { const a = e.asignaciones.find(x => x.id === b.dataset.rubCompleta); rubricaCompleta(rubrica(a.rubrica), a); });
+      $$('[data-firmada]').forEach(b => b.onclick = () => descargarArchivo({ asignacionId: b.dataset.firmada, cual: 'firmada' }));
+      $$('[data-subir-firmada]').forEach(b => b.onclick = () => modalFirmada(b.dataset.subirFirmada));
+      const cr = $('[data-cambiar-res]'); if (cr) cr.onclick = () => modalReclasificar(e);
       const vd = $('[data-ver-dir]'); if (vd) vd.onclick = () => verCorrDirectora(e);
       const pf = $('[data-plataforma]'); if (pf) pf.onclick = () => modalPlataforma(e);
       const pu = $('[data-publicado]'); if (pu) pu.onclick = () => modal(`<h2>Marcar como publicada</h2><p class="suave">Pega el enlace de la obra en la gaceta (opcional).</p><label class="campo"><span>Enlace en la gaceta</span><input type="url" name="url" placeholder="https://hicimosloquequisimos-cmd.github.io/obra/…"></label><div class="botones"><button class="btn btn--verde" data-si>Marcar como publicada</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
@@ -415,11 +487,44 @@
       });
     },
   };
+  // Rúbrica como en el formato de la gaceta: criterios × niveles, con ☒ en lo que marcó el evaluador
+  function matrizRubrica(r, niveles) {
+    const corto = t => String(t || '').replace(/^\d\s·\s/, '');
+    return `<div class="matriz-env"><table class="matriz"><thead><tr><th>Criterio</th>${r.niveles.map((n, j) => `<th title="${esc(n)}">${j + 1}</th>`).join('')}</tr></thead><tbody>
+      ${r.criterios.map((c, k) => `<tr><td>${esc(c.nombre)}</td>${c.niveles.map((d, j) => `<td class="${niveles[k] === j + 1 ? 'marcada' : ''}" title="${esc(d)}">${niveles[k] === j + 1 ? '☒' : '☐'}</td>`).join('')}</tr>`).join('')}
+      </tbody></table></div><p class="meta" style="margin:.3rem 0 0">${r.niveles.map((n, j) => `${j + 1} ${esc(corto(n))}`).join(' · ')}</p>`;
+  }
+  function rubricaCompleta(r, a) {
+    modal(`<h2>Rúbrica · ${esc(r.nombre)}</h2><p class="suave">${esc(a.evaluador || 'Evaluador/a')} · puntaje <b>${punt(a.puntaje)}</b> · ${esc(DICT[a.dictamen] || '')}. Lo que marcó está resaltado con ☒.</p>
+      <div class="matriz-env"><table class="matriz matriz--completa"><thead><tr><th>Criterio</th>${r.niveles.map(n => `<th>${esc(n)}</th>`).join('')}</tr></thead><tbody>
+      ${r.criterios.map((c, k) => `<tr><td><b>${esc(c.nombre)}</b></td>${c.niveles.map((d, j) => `<td class="${a.niveles[k] === j + 1 ? 'marcada' : ''}"><span class="casilla">${a.niveles[k] === j + 1 ? '☒' : '☐'}</span> ${esc(d)}</td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>
+      ${a.observaciones ? `<p class="meta" style="margin-top:1rem">Observaciones</p><p style="white-space:pre-wrap">${esc(a.observaciones)}</p>` : ''}
+      <div class="botones" style="margin-top:1rem"><button class="btn" data-cerrar>Cerrar</button></div>`, () => { $('.modal', $('#modal')).style.width = 'min(1100px, 100%)'; });
+  }
+  function estadoFirma(a) {
+    if (a.firmadaId) return `<div class="firma si">✓ Rúbrica firmada${a.firmadaId === a.rubricaId ? ' (firma digital)' : ''}${a.firmadaFecha ? ` · ${fecha(a.firmadaFecha)}` : ''}${a.firmadaPor && a.firmadaPor !== a.evaluador && a.firmadaId !== a.rubricaId ? ` · subida por ${esc(a.firmadaPor)}` : ''} <button class="btn btn--chico" data-firmada="${esc(a.id)}">Ver firmada</button>${tiene('auxiliar') ? ` <button class="btn btn--chico" data-subir-firmada="${esc(a.id)}">Reemplazar</button>` : ''}</div>`;
+    return `<div class="firma no">⚠ Falta la rúbrica firmada${tiene('auxiliar') ? ` <button class="btn btn--chico" data-subir-firmada="${esc(a.id)}">Subir rúbrica firmada</button>` : ''}</div>`;
+  }
+  function modalFirmada(asignacionId, alTerminar) {
+    modal(`<h2>Subir rúbrica firmada</h2><p class="suave">Sube la rúbrica <b>firmada</b> por quien evaluó: un PDF, una foto o un Word con firma digital. Queda guardada en la carpeta del envío en Drive.</p>
+      <label class="campo"><span>Archivo (PDF, imagen o Word)</span><input type="file" name="f" accept=".pdf,.jpg,.jpeg,.png,.heic,.docx,.doc"></label>
+      <div class="botones"><button class="btn btn--rojo" data-si>Subir</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
+      $('[data-si]', m).onclick = async () => {
+        const f = $('[name=f]', m).files[0]; if (!f) return toast('Elige el archivo.', true);
+        if (f.size > 15e6) return toast('El archivo pesa demasiado (máximo 15 MB).', true);
+        const b = $('[data-si]', m); b.disabled = true; b.textContent = 'Subiendo…';
+        try { const d = await leerArchivoLocal(f); await api('subirFirmada', { asignacionId, ...d }); cerrar(); toast('Rúbrica firmada guardada ✓'); if (alTerminar) alTerminar(); else ruta(); }
+        catch (er) { toast(er.message, true); b.disabled = false; b.textContent = 'Subir'; }
+      };
+    });
+  }
   function tarjetaEvaluacion(a, i) {
     const r = rubrica(a.rubrica);
     return `<div class="tarjeta"><div class="meta">${tiene('auxiliar') || tiene('directora') ? esc(a.evaluador) : 'Evaluador/a ' + (i + 1)} · ${fecha(a.entregada)}${a.ronda > 1 ? ` · ronda ${a.ronda}` : ''}</div>
       <div style="display:flex;align-items:baseline;gap:.8rem;margin:.4rem 0 .6rem"><span style="font-size:1.9rem;font-weight:650;line-height:1">${punt(a.puntaje)}</span>${dictChip(a.dictamen)}</div>
-      <div class="rub-lectura">${r && a.niveles && a.niveles.length ? r.criterios.map((c, k) => `<div class="crit"><b>${a.niveles[k]} · ${esc((r.niveles[a.niveles[k] - 1] || '').replace(/^\d\s·\s/, ''))}</b><div>${esc(c.nombre)}</div><div class="suave" style="font-size:.88rem">${esc(c.niveles[a.niveles[k] - 1] || '')}</div></div>`).join('') : `<p class="suave">${a.modo === 'word' ? 'Calificó con su propio archivo de Word.' : ''}</p>`}</div>
+      ${r && a.niveles && a.niveles.length ? matrizRubrica(r, a.niveles) + `<button class="btn btn--chico" style="margin-top:.5rem" data-rub-completa="${esc(a.id)}">Ver rúbrica completa</button>` : `<p class="suave">${a.modo === 'word' ? 'Calificó con su propio archivo de Word: la rúbrica está en «Su rúbrica (archivo)».' : ''}</p>`}
+      ${estadoFirma(a)}
       ${a.observaciones ? `<p class="meta" style="margin-top:.8rem">Observaciones</p><p style="white-space:pre-wrap">${esc(a.observaciones)}</p>` : ''}
       <div class="botones" style="margin-top:.8rem">
         ${(a.anotaciones || []).length ? `<button class="btn btn--chico btn--claro" data-ver-eval="${esc(a.id)}">Ver correcciones (${a.anotaciones.length})</button>` : ''}
@@ -445,6 +550,7 @@
     } catch (er) { toast(er.message, true); }
   }
   async function wordRubrica(e, a) {
+    if (a.rubricaId) return descargarArchivo({ asignacionId: a.id, cual: 'rubrica' });
     try {
       const fecha = new Date(a.entregada || Date.now()).toLocaleDateString('es-CO');
       const bytes = await Docx.llenarRubrica(await plantillaRubrica(a.rubrica), { titulo: e.titulo, codigo: e.id, fecha, evaluador: a.evaluador || S.usuario.nombre, enlace: a.enlace, niveles: a.niveles, puntaje: a.puntaje, dictamen: a.dictamen, observaciones: a.observaciones });
@@ -480,11 +586,13 @@
       <label class="campo"><span>Mensaje listo</span><select name="plantilla">${plantillas.map(p => `<option value="${esc(p.clave)}" ${p.clave === inicial.clave ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select></label>
       <label class="campo"><span>Asunto</span><input type="text" name="asunto"></label>
       <label class="campo"><span>Mensaje</span><textarea name="cuerpo" style="min-height:14rem"></textarea></label>
-      ${e.dirCorr && e.dirCorr.archivoId ? `<label class="chequeo"><input type="checkbox" name="adj" value="directora|" ${tipo === 'directora' ? 'checked' : ''}> Correcciones de la Directora (Word con comentarios y control de cambios)</label>` : ''}
-      ${entregadas.some(a => (a.anotaciones || []).length || a.correccionId || a.subidaCorreccionId) ? `<span class="meta">Adjuntar correcciones (con comentarios y control de cambios, sin nombres de evaluadores)</span>${entregadas.map((a, i) => `<label class="chequeo"><input type="checkbox" name="adj" value="correccion|${esc(a.id)}" ${tipo === 'ajustes' ? 'checked' : ''}> Correcciones del evaluador ${i + 1}</label>`).join('')}` : ''}
-      ${entregadas.length ? `${entregadas.map((a, i) => `<label class="chequeo"><input type="checkbox" name="adj" value="rubrica|${esc(a.id)}"> Rúbrica del evaluador ${i + 1}</label>`).join('')}` : ''}
+      ${e.dirCorr && e.dirCorr.archivoId ? `<label class="chequeo"><input type="checkbox" name="adj" value="directora|" ${tipo === 'directora' || (tipo === 'aceptado' && e.dirCorr.aplicadas) ? 'checked' : ''}> Correcciones de la Directora (Word con comentarios y control de cambios)</label>` : ''}
+      ${entregadas.some(a => (a.anotaciones || []).length || a.correccionId || a.subidaCorreccionId) ? `<span class="meta">Adjuntar correcciones (con comentarios y control de cambios, sin nombres de evaluadores)</span>${entregadas.map((a, i) => `<label class="chequeo"><input type="checkbox" name="adj" value="correccion|${esc(a.id)}" ${['ajustes', 'no'].includes(tipo) ? 'checked' : ''}> Correcciones del lector/a ${i + 1}</label>`).join('')}` : ''}
+      <p class="suave" style="font-size:.85rem;margin-top:.6rem">🔒 Las rúbricas son internas del equipo: no se envían a la autora.</p>
       <div class="botones" style="margin-top:1rem"><button class="btn btn--rojo" data-si>Enviar</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
-      const poner = () => { const p = plantillas.find(x => x.clave === $('[name=plantilla]', m).value); $('[name=asunto]', m).value = rellenar(p.asunto, e); $('[name=cuerpo]', m).value = rellenar(p.cuerpo, e); };
+      const obs = observacionesPara(e);
+      const poner = () => { const p = plantillas.find(x => x.clave === $('[name=plantilla]', m).value); $('[name=asunto]', m).value = rellenar(p.asunto, e, obs); $('[name=cuerpo]', m).value = rellenar(conObservaciones(p.cuerpo, p.clave, obs), e, obs);
+        $$('[name=adj]', m).forEach(x => { if (x.value.startsWith('correccion|')) x.checked = ['ajustes', 'no'].includes(p.clave); }); };
       poner(); $('[name=plantilla]', m).onchange = poner;
       $('[data-si]', m).onclick = async () => {
         const b = $('[data-si]', m); b.disabled = true;
@@ -508,6 +616,18 @@
       $('[data-si]', m).onclick = async () => {
         const c = $('[name=conf]', m).value.trim().toUpperCase(); if (c !== e.id) return toast('Escribe el código exacto: ' + e.id, true);
         try { await api('borrarEnvio', { id: e.id, confirmar: c }); cerrar(); toast(`${e.id} borrado`); location.hash = tiene('auxiliar') ? '#envios' : '#inicio'; } catch (er) { toast(er.message, true); }
+      };
+    });
+  }
+  function modalReclasificar(e) {
+    const ops = [['aceptada', 'Aceptado', 'Pasa a la Directora para su revisión.'], ['ajustes', 'Aceptado con ajustes', 'Vuelve a ti para avisarle a la autora con las correcciones (también le llega a la Directora).'], ['no', 'No aceptado', 'Vuelve a ti para avisarle a la autora. No pasa por la Directora.']];
+    modal(`<h2>Cambiar resultado</h2><p class="suave">Úsalo solo si «${esc(e.titulo)}» quedó mal clasificado. El texto pasa al grupo nuevo, sigue el camino que le corresponde y su carpeta se mueve en Drive. Queda registrado en el historial.</p>
+      ${ops.map(([k, t, d]) => `<label class="chequeo" style="align-items:flex-start"><input type="radio" name="res" value="${k}" ${e.decision === k ? 'disabled' : ''}> <span><b>${t}</b>${e.decision === k ? ' (actual)' : ''}<br><span class="suave" style="font-size:.85rem">${d}</span></span></label>`).join('')}
+      <label class="campo" style="margin-top:.8rem"><span>Motivo del cambio</span><textarea name="nota" placeholder="Ej.: la Directora pidió reconsiderarlo tras leer las rúbricas."></textarea></label>
+      <div class="botones"><button class="btn btn--rojo" data-si>Cambiar</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
+      $('[data-si]', m).onclick = async () => {
+        const r = $('[name=res]:checked', m); if (!r) return toast('Elige el nuevo resultado.', true);
+        try { await api('reclasificar', { envioId: e.id, decision: r.value, nota: $('[name=nota]', m).value }); cerrar(); toast('Resultado cambiado'); ruta(); } catch (er) { toast(er.message, true); }
       };
     });
   }
@@ -555,6 +675,19 @@
       };
     });
   }
+  // Aplica las correcciones al texto (como «Aceptar todos los cambios» en Word). Los comentarios no cambian el texto.
+  function aplicarCorrecciones(parrafos, anotaciones) {
+    return parrafos.map((par, pi) => {
+      let t = par.texto;
+      anotaciones.filter(a => a.p === pi && a.tipo !== 'comentario').sort((x, y) => y.ini - x.ini || (x.tipo === 'insertar' ? 1 : -1))
+        .forEach(a => {
+          if (a.tipo === 'borrar') t = t.slice(0, a.ini) + t.slice(a.fin);
+          else if (a.tipo === 'reemplazar') t = t.slice(0, a.ini) + (a.nuevo || '') + t.slice(a.fin);
+          else if (a.tipo === 'insertar' && a.nuevo) t = t.slice(0, a.ini) + a.nuevo + t.slice(a.ini);
+        });
+      return t.replace(/ {2,}/g, ' ');
+    }).filter((t, i) => !(t.trim() === '' && parrafos[i].texto.trim() !== '')); // un verso tachado completo no deja línea vacía
+  }
   // ---------- La Directora corrige el texto ----------
   RUTAS.corregir = {
     render: async id => {
@@ -574,13 +707,25 @@
   };
   function pintarCorrDirectora() {
     const z = $('#zona-corr'); if (!z) return;
-    z.innerHTML = `<div class="ayuda"><b>Cómo funciona:</b> marca tus correcciones igual que en Word: selecciona una palabra o frase y elige <b>Comentar</b>, <b>Tachar</b> o <b>Cambiar por…</b>, o toca un punto para <b>Insertar</b>. Al terminar, se las envías a la Auxiliar, que se las manda a la autora para que las revise y responda.</div>
+    z.innerHTML = `<div class="ayuda"><b>Cómo funciona:</b> marca tus correcciones igual que en Word: selecciona una palabra o frase y elige <b>Comentar</b>, <b>Tachar</b> o <b>Cambiar por…</b>, o toca un punto para <b>Insertar</b>. Al terminar, elige: <b>Enviar a la Auxiliar</b> (la autora revisa tus correcciones y responde) o <b>Corregir y aprobar para publicar</b> (tus correcciones se aplican y la obra sigue a plataforma con el texto final corregido).</div>
       ${E.textoError ? `<div class="vacio">${esc(E.textoError)}</div>` : `<div class="corrector"><div class="hoja" id="hoja">${pintarHoja(E.parrafos, E.anotaciones)}</div><aside class="margen" id="margen">${listaNotas(E.parrafos, E.anotaciones, true)}</aside></div>`}
       <label class="campo" style="margin-top:1rem"><span>Nota general para la autora (opcional)</span><textarea data-nota-dir>${esc(E.nota)}</textarea></label>
-      <div class="resultado"><span class="meta" data-guardado>${E.anotaciones.length} corrección(es)</span><span style="flex:1"></span>${E.parrafos && E.anotaciones.length ? '<button class="btn" data-previa>Ver en Word</button>' : ''}<button class="btn btn--rojo" data-enviar-dir>Enviar correcciones a la Auxiliar</button></div>`;
+      <div class="resultado"><span class="meta" data-guardado>${E.anotaciones.length} corrección(es)</span><span style="flex:1"></span>${E.parrafos && E.anotaciones.length ? '<button class="btn" data-previa>Ver en Word</button>' : ''}<button class="btn" data-enviar-dir>Enviar a la Auxiliar (la autora revisa)</button><button class="btn btn--verde" data-corr-aprobar>Corregir y aprobar para publicar</button></div>`;
     conectarHoja();
     const t = $('[data-nota-dir]'); t.oninput = () => { E.nota = t.value; guardarBorradorPronto(); };
     const pv = $('[data-previa]'); if (pv) pv.onclick = async () => descargar(`${E.env.id} · correcciones de la Dirección.docx`, await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
+    $('[data-corr-aprobar]').onclick = async () => {
+      if (!E.anotaciones.length) return toast('Haz al menos una corrección. Si no hay nada que corregir, usa «Aprobar para publicar».', true);
+      if (!E.parrafos) return toast('Este texto no se puede corregir en la página.', true);
+      const final = aplicarCorrecciones(E.parrafos, E.anotaciones);
+      if (!await confirmar('¿Corregir y aprobar para publicar?', `Tus ${E.anotaciones.length} corrección(es) se aplican al texto y queda un <b>texto final ya corregido</b>. La Auxiliar le avisa a la autora y lo envía a plataforma; Sebastian recibe el texto final y el Word con tus correcciones marcadas.<br><br><span class="suave">Los comentarios no cambian el texto: quedan solo en el Word de correcciones.</span>`, 'Corregir y aprobar')) return;
+      try {
+        const d = { envioId: E.env.id, decision: 'corregirAprobar', anotaciones: E.anotaciones, nota: E.nota };
+        d.correccionDocx = Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
+        d.finalDocx = Docx.aBase64(await Docx.desdeTexto(final.join('\n')));
+        await api('decidir', d); clearTimeout(tBorrador); E = null; toast('Aprobada con tus correcciones ✓'); location.hash = '#envio/' + d.envioId;
+      } catch (er) { toast(er.message, true); }
+    };
     $('[data-enviar-dir]').onclick = async () => {
       if (!E.anotaciones.length && !E.nota.trim()) return toast('Haz al menos una corrección o escribe una nota.', true);
       if (!await confirmar('¿Enviar las correcciones?', `${E.anotaciones.length} corrección(es). La Auxiliar recibe el aviso y se las manda a la autora; cuando ella responda con la versión final, el texto vuelve a ti.`, 'Enviar')) return;
@@ -596,7 +741,7 @@
   RUTAS.plantillas = {
     render: async () => {
       const { plantillas } = await api('plantillas'); S._plant = plantillas;
-      return `<div class="cabecera"><div><p class="meta">Auxiliar</p><h1>Mensajes listos</h1><p class="suave">Los textos que se le envían a los autores. Puedes usar {titulo}, {autor} y {codigo}: se reemplazan solos.</p></div></div>
+      return `<div class="cabecera"><div><p class="meta">Auxiliar</p><h1>Mensajes listos</h1><p class="suave">Los textos que se le envían a los autores. Puedes usar {titulo}, {autor}, {codigo} y {observaciones} (los comentarios de los evaluadores, sin nombres; si no lo pones en «No aceptado» o «Aceptado con ajustes», se agregan solos antes de la despedida): se reemplazan solos.</p></div></div>
         ${plantillas.map(p => `<form class="tarjeta" data-plant="${esc(p.clave)}"><h3>${esc(p.nombre)}</h3><label class="campo"><span>Asunto</span><input type="text" name="asunto" value="${esc(p.asunto)}"></label><label class="campo"><span>Mensaje</span><textarea name="cuerpo" style="min-height:12rem">${esc(p.cuerpo)}</textarea></label><button class="btn btn--chico btn--rojo">Guardar</button></form>`).join('')}`;
     },
     conectar: () => $$('[data-plant]').forEach(f => f.onsubmit = async e => { e.preventDefault(); try { await api('guardarPlantilla', { clave: f.dataset.plant, nombre: S._plant.find(p => p.clave === f.dataset.plant).nombre, asunto: f.asunto.value, cuerpo: f.cuerpo.value }); toast('Mensaje guardado'); } catch (er) { toast(er.message, true); } }),
@@ -639,7 +784,8 @@
     const ro = E.entregada;
     const n = E.rub ? E.rub.criterios.length : 0;
     const { puntaje, dictamen } = calcular(E.niveles, n);
-    const descargas = `<div class="tarjeta"><h3>Archivos</h3><div class="botones"><button class="btn btn--chico" data-bajar-texto>Descargar el texto (Word original)</button><button class="btn btn--chico" data-bajar-rub>Descargar rúbrica en blanco (Word)</button>${ro && E.niveles.filter(Boolean).length ? '<button class="btn btn--chico" data-mi-rub>Mi rúbrica llena (Word)</button>' : ''}${ro && E.anotaciones.length ? '<button class="btn btn--chico" data-mi-corr>Mi texto corregido (Word)</button>' : ''}</div></div>`;
+    const firma = ro ? `<div class="tarjeta" style="border-color:${E.a.firmadaId ? 'var(--borde)' : 'var(--canaguate)'}"><h3>Rúbrica firmada</h3>${E.a.firmadaId ? `<p>✓ ${E.a.firmadaId === E.a.rubricaId ? 'Tu rúbrica quedó firmada automáticamente con tu firma guardada' : 'Ya subiste tu rúbrica firmada'}${E.a.firmadaFecha ? ` (${fecha(E.a.firmadaFecha)})` : ''}.</p><div class="botones"><button class="btn btn--chico" data-ver-firmada>Ver mi rúbrica firmada</button><button class="btn btn--chico" data-mi-firmada>Reemplazarla</button></div>` : `<p class="suave">Para que la evaluación quede en regla, sube tu rúbrica con tu firma:</p><ol style="margin:.4rem 0 1rem 1.1rem;padding:0"><li>${E.niveles.filter(Boolean).length ? 'Descarga <b>Mi rúbrica llena (Word)</b>' : 'Usa la rúbrica que llenaste en Word'}.</li><li>Fírmala: imprímela y fírmala a mano, o pon tu firma digital.</li><li>Súbela aquí como PDF, foto o Word.</li></ol><div class="botones">${E.niveles.filter(Boolean).length ? '<button class="btn btn--chico" data-mi-rub>1 · Mi rúbrica llena (Word)</button>' : ''}<button class="btn btn--rojo btn--chico" data-mi-firmada>3 · Subir rúbrica firmada</button></div><p class="suave" style="font-size:.85rem;margin-top:.8rem">Para no tener que hacer esto cada vez, pídele a Sebastian o a Luisa que carguen tu firma en «Perfiles».</p>`}</div>` : '';
+    const descargas = firma + `<div class="tarjeta"><h3>Archivos</h3><div class="botones"><button class="btn btn--chico" data-bajar-texto>Descargar el texto (Word original)</button><button class="btn btn--chico" data-bajar-rub>Descargar rúbrica en blanco (Word)</button>${ro && E.niveles.filter(Boolean).length ? '<button class="btn btn--chico" data-mi-rub>Mi rúbrica llena (Word)</button>' : ''}${ro && E.anotaciones.length ? '<button class="btn btn--chico" data-mi-corr>Mi texto corregido (Word)</button>' : ''}</div></div>`;
     if (E.modo === 'word' && !ro) {
       z.innerHTML = `<div class="ayuda">Descarga el texto y la rúbrica, trabájalos en Word en tu computador y súbelos aquí. Después marca tu puntaje y dictamen para que el sistema sepa a dónde enviar la obra.</div>${descargas}
         <div class="tarjeta"><h3>Subir mis archivos</h3>
@@ -661,6 +807,7 @@
           ${E.rub && E.rub.conEnlace ? `<label class="campo"><span>Enlace o archivo de la obra</span><input type="text" data-enlace value="${esc(E.enlace)}" ${ro ? 'disabled' : ''}></label>` : ''}
           ${E.rub ? E.rub.criterios.map((c, k) => `<div class="criterio"><h3><span>${esc(c.nombre)}</span>${E.niveles[k] ? `<span class="estado" style="border-color:var(--acento);color:#fff">${E.niveles[k]}</span>` : ''}</h3><div class="niveles">${c.niveles.map((d, j) => `<button type="button" class="nivel" data-crit="${k}" data-nivel="${j + 1}" aria-pressed="${E.niveles[k] === j + 1}" ${ro ? 'disabled' : ''}><b>${esc(E.rub.niveles[j])}</b>${esc(d)}</button>`).join('')}</div></div>`).join('') : '<div class="vacio">No se encontró la rúbrica.</div>'}
           <label class="campo"><span>Observaciones y ajustes sugeridos a quien escribe</span><textarea data-obs ${ro ? 'disabled' : ''}>${esc(E.observaciones)}</textarea></label>
+          ${ro ? '' : (S.usuario.tieneFirma ? '<p class="firma si" style="margin:.4rem 0">✍ Tu firma guardada se pondrá sola en la rúbrica al entregar.</p>' : '<p class="firma no" style="margin:.4rem 0">✍ No tienes firma guardada: después de entregar tendrás que subir la rúbrica firmada (o pídele a Sebastian o a Luisa que carguen tu firma).</p>')}
           <div class="resultado"><div><span class="meta">Puntaje</span><br><b>${punt(puntaje)}</b></div><div><span class="meta">Dictamen</span><br>${dictamen ? dictChip(dictamen) : '<span class="suave">Califica todos los criterios</span>'}</div><span style="flex:1"></span>${ro ? '' : `<span class="meta" data-guardado></span><button class="btn btn--rojo" data-entregar ${puntaje == null ? 'disabled' : ''}>Entregar evaluación</button>`}</div>
         </div>${descargas}`;
     }
@@ -681,7 +828,9 @@
     $$('[data-subir]').forEach(i => i.onchange = async () => { const f = i.files[0]; if (!f) return; if (f.size > 15e6) return toast('El archivo pesa demasiado (máximo 15 MB).', true); E.subidas[i.dataset.subir] = await leerArchivoLocal(f); pintarEvaluacion(); });
     const bt = $('[data-bajar-texto]'); if (bt) bt.onclick = () => { if (E.textoB64) descargar(`${E.env.id} · texto.docx`.replace('.docx', (E.textoNombre.match(/\.[a-z0-9]+$/i) || ['.docx'])[0]), Docx.deBase64(E.textoB64)); };
     const br = $('[data-bajar-rub]'); if (br) br.onclick = async () => descargar(`Rúbrica · ${E.rub.nombre} · ${E.env.id}.docx`, await Docx.llenarRubrica(await plantillaRubrica(E.a.rubrica), { titulo: E.env.titulo, codigo: E.env.id, fecha: new Date().toLocaleDateString('es-CO'), evaluador: E.evaluador }));
-    const mr = $('[data-mi-rub]'); if (mr) mr.onclick = () => wordRubrica({ id: E.env.id, titulo: E.env.titulo }, { ...E.a, evaluador: E.evaluador });
+    const mf = $('[data-mi-firmada]'); if (mf) mf.onclick = () => modalFirmada(E.id, () => ruta());
+    const vf = $('[data-ver-firmada]'); if (vf) vf.onclick = () => descargarArchivo({ asignacionId: E.id, cual: 'firmada' });
+    $$('[data-mi-rub]').forEach(b => b.onclick = () => wordRubrica({ id: E.env.id, titulo: E.env.titulo }, { ...E.a, evaluador: E.evaluador }));
     const mc = $('[data-mi-corr]'); if (mc) mc.onclick = async () => descargar(`${E.env.id} · texto corregido.docx`, await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: E.evaluador, iniciales: iniciales(E.evaluador), titulo: `${E.env.id} · ${E.env.titulo}` }));
     const ent = $('[data-entregar]'); if (ent) ent.onclick = entregar;
     conectarHoja();
@@ -831,13 +980,15 @@
       if (word) { datos.niveles = []; datos.anotaciones = []; datos.subidaRubrica = E.subidas.rubrica; if (E.subidas.correccion) datos.subidaCorreccion = E.subidas.correccion; }
       else {
         datos.niveles = E.niveles; datos.anotaciones = E.anotaciones;
-        // Copia que se le puede enviar a la autora: sin el nombre del evaluador (doble ciego)
-        datos.rubricaDocx = Docx.aBase64(await Docx.llenarRubrica(await plantillaRubrica(E.a.rubrica), { titulo: E.env.titulo, codigo: E.env.id, fecha: new Date().toLocaleDateString('es-CO'), evaluador: 'Comité editorial · Hicimos lo que quisimos', enlace: E.enlace, niveles: E.niveles, puntaje, dictamen, observaciones: E.observaciones }));
+        // Rúbrica llena (interna del equipo), con la firma guardada en el perfil si la hay
+        let firmaPng = null; try { const f = (await api('miFirma')).firma; if (f) firmaPng = Docx.deBase64(f); } catch (e) { }
+        datos.rubricaDocx = Docx.aBase64(await Docx.llenarRubrica(await plantillaRubrica(E.a.rubrica), { titulo: E.env.titulo, codigo: E.env.id, fecha: new Date().toLocaleDateString('es-CO'), evaluador: E.evaluador, enlace: E.enlace, niveles: E.niveles, puntaje, dictamen, observaciones: E.observaciones, firmaPng }));
+        datos.firmadaAuto = !!firmaPng;
         // Para el autor: correcciones sin el nombre del evaluador
         if (E.anotaciones.length && E.parrafos) datos.correccionDocx = Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Evaluación · Hicimos lo que quisimos', iniciales: 'HLQQ', titulo: `${E.env.id} · ${E.env.titulo}` }));
       }
       await api('entregar', datos);
-      toast('¡Evaluación entregada! Gracias.'); location.hash = '#evaluaciones';
+      toast('¡Evaluación entregada! Ahora sube tu rúbrica firmada.'); location.hash = '#evaluacion/' + E.id; ruta();
     } catch (er) { toast(er.message, true); if (b) { b.disabled = false; b.textContent = 'Entregar evaluación'; } }
   }
 
@@ -848,13 +999,14 @@
     render: async () => {
       const { usuarios } = await api('usuarios'); S._us = usuarios;
       return `<div class="cabecera"><div><p class="meta">Administración</p><h1>Perfiles</h1><p class="suave">Crea, edita o borra perfiles. Si a alguien se le olvida la contraseña, dale una temporal con «Nueva contraseña».</p></div><button class="btn btn--rojo" data-nuevo>Nuevo perfil</button></div>
-        <table class="tabla-perfiles"><thead><tr><th>Nombre</th><th>Perfiles</th><th>Correo para avisos</th><th></th></tr></thead><tbody>
-        ${usuarios.map(u => `<tr><td><b>${esc(u.nombre)}</b>${u.activo ? '' : ' <span class="estado e-cerrado">Inactivo</span>'}${u.debeCambiar ? ' <span class="meta">· aún no cambia su contraseña</span>' : ''}</td><td>${u.roles.map(r => `<span class="estado" style="margin:.1rem">${ROLES[r]}</span>`).join(' ')}</td><td class="suave">${esc(u.correo || '—')}</td><td><div class="botones"><button class="btn btn--chico" data-editar-u="${esc(u.id)}">Editar</button><button class="btn btn--chico" data-clave-u="${esc(u.id)}">Nueva contraseña</button></div></td></tr>`).join('')}
+        <table class="tabla-perfiles"><thead><tr><th>Nombre</th><th>Perfiles</th><th>Correo para avisos</th><th>Firma</th><th></th></tr></thead><tbody>
+        ${usuarios.map(u => `<tr><td><b>${esc(u.nombre)}</b>${u.activo ? '' : ' <span class="estado e-cerrado">Inactivo</span>'}${u.debeCambiar ? ' <span class="meta">· aún no cambia su contraseña</span>' : ''}</td><td>${u.roles.map(r => `<span class="estado" style="margin:.1rem">${ROLES[r]}</span>`).join(' ')}</td><td class="suave">${esc(u.correo || '—')}</td><td>${u.roles.includes('evaluador') ? (u.tieneFirma ? '<span class="estado e-listo_publicar">✓ Cargada</span>' : '<span class="estado e-por_asignar">Sin firma</span>') : '<span class="suave">—</span>'}</td><td><div class="botones">${u.roles.includes('evaluador') ? `<button class="btn btn--chico" data-firma-u="${esc(u.id)}">Firma</button>` : ''}<button class="btn btn--chico" data-editar-u="${esc(u.id)}">Editar</button><button class="btn btn--chico" data-clave-u="${esc(u.id)}">Nueva contraseña</button></div></td></tr>`).join('')}
         </tbody></table>`;
     },
     conectar: () => {
       $('[data-nuevo]').onclick = () => editarUsuario(null);
       $$('[data-editar-u]').forEach(b => b.onclick = () => editarUsuario(S._us.find(u => u.id === b.dataset.editarU)));
+      $$('[data-firma-u]').forEach(b => b.onclick = () => modalFirmaPerfil(S._us.find(u => u.id === b.dataset.firmaU)));
       $$('[data-clave-u]').forEach(b => b.onclick = async () => {
         const u = S._us.find(x => x.id === b.dataset.claveU);
         if (!await confirmar(`¿Nueva contraseña para ${u.nombre}?`, 'Su contraseña actual deja de funcionar. Le daremos una temporal y, al entrar, tendrá que crear la suya.')) return;
@@ -862,6 +1014,22 @@
       });
     },
   };
+  async function modalFirmaPerfil(u) {
+    let f = null; try { f = (await api('firmaDe', { usuarioId: u.id })).firma; } catch (e) { }
+    modal(`<h2>Firma de ${esc(u.nombre)}</h2><p class="suave">Esta firma se pondrá sola en cada rúbrica que ${esc(u.nombre.split(' ')[0])} entregue, en la línea «Firma del evaluador(a)», y la rúbrica quedará firmada.</p>
+      ${f ? `<div class="firma-vista"><img src="data:image/png;base64,${f}" alt="Firma"></div>` : '<div class="vacio" style="padding:1rem">Todavía no tiene firma cargada.</div>'}
+      <label class="campo" style="margin-top:1rem"><span>${f ? 'Cambiar la firma' : 'Cargar la firma'} (imagen PNG, mejor con fondo blanco o transparente)</span><input type="file" accept="image/png" name="png"></label>
+      <p class="suave" style="font-size:.85rem">Pídele que firme en una hoja blanca y te mande una foto bien iluminada; recórtala y guárdala como PNG.</p>
+      <div class="botones"><button class="btn btn--rojo" data-si>Guardar firma</button>${f ? '<button class="btn" data-quitar>Quitar firma</button>' : ''}<button class="btn" data-cerrar>Cerrar</button></div>`, (m, cerrar) => {
+      $('[data-si]', m).onclick = async () => {
+        const file = $('[name=png]', m).files[0]; if (!file) return toast('Elige la imagen de la firma (PNG).', true);
+        if (!/png$/i.test(file.type) && !/\.png$/i.test(file.name)) return toast('La firma debe ser una imagen PNG.', true);
+        if (file.size > 1.5e6) return toast('La imagen pesa demasiado (máximo 1,5 MB).', true);
+        try { const d = await leerArchivoLocal(file); await api('guardarFirma', { usuarioId: u.id, b64: d.b64 }); cerrar(); toast('Firma guardada ✓'); ruta(); } catch (er) { toast(er.message, true); }
+      };
+      const q = $('[data-quitar]', m); if (q) q.onclick = async () => { try { await api('quitarFirma', { usuarioId: u.id }); cerrar(); toast('Firma quitada'); ruta(); } catch (er) { toast(er.message, true); } };
+    });
+  }
   function mostrarClave(nombre, clave) {
     modal(`<h2>Contraseña temporal</h2><p class="suave">Dásela a <b>${esc(nombre)}</b> en persona o por mensaje privado. Al entrar, la página le pedirá crear su propia contraseña.</p><div class="clave-temporal">${esc(clave)}</div><div class="botones" style="margin-top:1rem"><button class="btn" data-copiar>Copiar</button><button class="btn btn--claro" data-cerrar>Listo</button></div>`, m => { $('[data-copiar]', m).onclick = () => navigator.clipboard.writeText(clave).then(() => toast('Copiada')); });
   }

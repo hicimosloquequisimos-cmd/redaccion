@@ -290,3 +290,25 @@ input[type=text], input[type=password], input[type=email], input[type=url], inpu
 .migas, .datos dt, .rub-lectura .crit b { letter-spacing: 0; text-transform: none; }
 .migas { font-size: .82rem; } .datos dt { font-size: .8rem; }
 .rub-lectura .crit b { font-size: .8rem; color: var(--acento); }
+button.cifra-g { font: inherit; width: 100%; }
+
+/* Rúbrica con casillas (como el formato de la gaceta) */
+.matriz-env { overflow-x: auto; margin: .3rem 0; border: 1px solid var(--borde); border-radius: 6px; }
+.matriz { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.matriz th, .matriz td { border-bottom: 1px solid var(--borde); padding: .4rem .45rem; text-align: center; vertical-align: middle; }
+.matriz th { font-weight: 650; color: var(--tinta); background: var(--panel2); font-size: .8rem; }
+.matriz th small { display: block; font-weight: 500; color: var(--suave); font-size: .66rem; }
+.matriz td:first-child, .matriz th:first-child { text-align: left; min-width: 9rem; }
+.matriz td { font-size: 1.05rem; color: var(--suave); }
+.matriz td:first-child { font-size: .84rem; color: var(--tinta); }
+.matriz td.marcada { color: #fff; background: rgba(91, 141, 239, .28); font-weight: 700; }
+.matriz tr:last-child td { border-bottom: 0; }
+.matriz--completa td { text-align: left; font-size: .8rem; color: var(--suave); min-width: 8.5rem; vertical-align: top; }
+.matriz--completa td.marcada { color: #fff; box-shadow: inset 0 0 0 2px var(--acento); }
+.matriz--completa .casilla { font-size: 1rem; margin-right: .2rem; }
+.firma { margin-top: .7rem; padding: .5rem .7rem; border-radius: 6px; font-size: .86rem; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.firma.si { background: rgba(143, 176, 122, .15); color: #B9D7A6; }
+.firma.no { background: rgba(242, 179, 61, .14); color: #F5C86E; }
+.firma-vista { background: #fff; border-radius: 6px; padding: .8rem; display: inline-block; } .firma-vista img { max-height: 90px; max-width: 100%; display: block; }
+
+.e-version_recibida { border-color: var(--buchon); color: var(--buchon); }

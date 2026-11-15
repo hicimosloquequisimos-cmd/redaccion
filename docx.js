@@ -268,7 +268,7 @@
           const primera = ci === 0 ? textoDe(c) : null;
           if (ci === 0) { if (/^\s*Puntaje/i.test(primera)) k = 'puntaje'; else k = fi - 1; return c; }
           if (k === 'puntaje') return ci === 1 && datos.puntaje != null ? agregarTexto(c, `  ${String(datos.puntaje).replace('.', ',')}`, { tam: 22, color: 'D93A2B', negrita: true }) : c;
-          return datos.niveles && datos.niveles[k] === ci ? marcar(c) : c;
+          return datos.niveles && Number(datos.niveles[k]) === ci ? marcar(c) : c;
         });
       } else if (/No aceptad/.test(txt) && /Aceptada con ajustes/.test(txt)) { // dictamen
         const idx = { no: 0, ajustes: 1, aceptada: 2 }[datos.dictamen];
@@ -280,13 +280,33 @@
     let out = '', ult = 0;
     for (const t of piezas) { out += xml.slice(ult, t.ini) + (t.nuevo ?? t.xml); ult = t.fin; }
     xml = out + xml.slice(ult);
-    // Firma: nombre de quien evaluó
-    if (datos.evaluador) {
+    // Firma: imagen de la firma (si la hay) y nombre de quien evaluó
+    let conFirma = false;
+    if (datos.evaluador || datos.firmaPng) {
       const f = xml.indexOf('Firma del evaluador');
-      if (f > -1) { const m = /_{6,}/.exec(xml.slice(f, f + 4000)); if (m) { const a = f + m.index; xml = xml.slice(0, a) + escXml(datos.evaluador) + xml.slice(a + m[0].length); } }
+      if (f > -1) {
+        const m = /_{6,}/.exec(xml.slice(f, f + 4000));
+        if (m) {
+          const a = f + m.index; let nuevo = escXml(datos.evaluador || '');
+          if (datos.firmaPng && datos.firmaPng.length > 24) {
+            const b = datos.firmaPng, ancho = (b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, alto = (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0;
+            let cy = 560000, cx = Math.round(cy * (ancho / (alto || 1))); if (cx > 2200000) { cx = 2200000; cy = Math.round(cx * (alto / (ancho || 1))); }
+            const dib = `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="9001" name="Firma del evaluador"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="9001" name="firma-evaluador.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdFirmaHLQQ"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+            nuevo = `</w:t></w:r>${dib}<w:r><w:t xml:space="preserve">  ${escXml(datos.evaluador || '')}`;
+            conFirma = true;
+          }
+          xml = xml.slice(0, a) + nuevo + xml.slice(a + m[0].length);
+        }
+      }
     }
     const entradas = [];
-    for (const n of zip.nombres) entradas.push({ nombre: n, datos: n === 'word/document.xml' ? xml : await zip.bytes(n) });
+    for (const n of zip.nombres) {
+      let d = n === 'word/document.xml' ? xml : await zip.bytes(n);
+      if (conFirma && n === 'word/_rels/document.xml.rels') d = (await zip.texto(n)).replace('</Relationships>', '<Relationship Id="rIdFirmaHLQQ" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/firma-evaluador.png"/></Relationships>');
+      if (conFirma && n === '[Content_Types].xml') { d = await zip.texto(n); if (!/Extension="png"/i.test(d)) d = d.replace(/(<Types[^>]*>)/, '$1<Default Extension="png" ContentType="image/png"/>'); }
+      entradas.push({ nombre: n, datos: d });
+    }
+    if (conFirma) entradas.push({ nombre: 'word/media/firma-evaluador.png', datos: datos.firmaPng });
     return escribirZip(entradas);
   }
 
