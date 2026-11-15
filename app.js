@@ -223,14 +223,18 @@
   // =========================================================
   RUTAS.bandeja = {
     render: async () => {
-      const r = await api('bandeja');
+      let todo = false; try { todo = localStorage.getItem('redaccion-correo-todo') === '1'; } catch (e) { }
+      const r = await api('bandeja', { todo });
       return `<div class="cabecera"><div><p class="meta">Gmail de la gaceta</p><h1>Correo</h1></div><button class="btn btn--chico" onclick="location.reload()">Actualizar</button></div>
+      <div class="modo" role="group" aria-label="Qué correos ver" style="margin-bottom:.6rem"><button data-filtro="docs" aria-pressed="${!todo}">📄 Solo documentos</button><button data-filtro="todo" aria-pressed="${todo}">Todo el correo</button></div>
+      <p class="suave" style="font-size:.88rem;margin:0 0 1rem">${todo ? 'Estás viendo todo el correo de la gaceta.' : 'Solo aparecen los correos que traen documentos adjuntos (Word, PDF…): los envíos de textos. El resto sigue en Gmail.'}</p>
       ${r.hilos.length ? `<ul class="lista">${r.hilos.map(h => `<li><a class="fila ${h.noLeido ? 'nuevo' : ''}" href="#hilo/${encodeURIComponent(h.hiloId)}">
         <div class="fila__cuerpo"><div class="meta">${esc(h.de.replace(/<.*>/, ''))} · ${hace(h.fecha)}${h.mensajes > 1 ? ` · ${h.mensajes} mensajes` : ''}</div>
         <div class="fila__titulo">${esc(h.asunto || '(sin asunto)')}</div><div class="fila__sub">${esc(h.fragmento)}</div>
         ${h.adjuntos.length ? `<div class="meta" style="margin-top:.3rem">📎 ${h.adjuntos.length} adjunto(s)</div>` : ''}</div>
-        ${h.envioId ? `<span class="estado e-listo_publicar">${esc(h.envioId)}</span>` : (h.adjuntos.length ? '<span class="estado e-por_asignar">Sin registrar</span>' : '')}</a></li>`).join('')}</ul>` : '<div class="vacio">No hay correos.</div>'}`;
+        ${h.envioId ? `<span class="estado e-listo_publicar">${esc(h.envioId)}</span>` : (h.adjuntos.length ? '<span class="estado e-por_asignar">Sin registrar</span>' : '')}</a></li>`).join('')}</ul>` : `<div class="vacio">${todo ? 'No hay correos.' : '<span class="mano">Nada nuevo</span>No hay correos con documentos adjuntos.'}</div>`}`;
     },
+    conectar: () => $$('[data-filtro]').forEach(b => b.onclick = () => { try { localStorage.setItem('redaccion-correo-todo', b.dataset.filtro === 'todo' ? '1' : '0'); } catch (e) { } ruta(); }),
   };
   RUTAS.hilo = {
     render: async id => {
