@@ -312,3 +312,9 @@ button.cifra-g { font: inherit; width: 100%; }
 .firma-vista { background: #fff; border-radius: 6px; padding: .8rem; display: inline-block; } .firma-vista img { max-height: 90px; max-width: 100%; display: block; }
 
 .e-version_recibida { border-color: var(--buchon); color: var(--buchon); }
+
+/* La Directora corrige en Word */
+.word-dir { margin-bottom: 1rem; }
+.pasos-word { margin: .4rem 0 0; padding-left: 1.3rem; display: grid; gap: .6rem; }
+.pasos-word li { padding-left: .2rem; }
+

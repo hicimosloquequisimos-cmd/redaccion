@@ -26,8 +26,52 @@
     const t = $('#toast'); t.textContent = msg; t.classList.toggle('error', !!error); t.classList.add('visible');
     clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('visible'), error ? 5000 : 2800);
   }
+  // ---------- Rapidez ----------
+  // Las listas aparecen al instante con lo último que se vio y se actualizan por detrás: si algo cambió
+  // (por ejemplo, lo que hizo otra persona), la pantalla se redibuja sola en uno o dos segundos.
+  // Cualquier acción que cambie algo borra esta memoria, así que lo propio se ve siempre al instante.
+  const LISTAS = { envios: 1, misEvaluaciones: 1, bandeja: 1, plantillas: 1, evaluadores: 1, usuarios: 1, ajustes: 1 };
+  const DETALLE = { envio: 1, evaluacion: 1, hilo: 1 };
+  const SOLO_LECTURA = { ...LISTAS, ...DETALLE, resumen: 1, notificaciones: 1, pulso: 1, archivo: 1, adjunto: 1, perfiles: 1, yo: 1, miFirma: 1, firmaDe: 1 };
+  const RUTAS_VIVAS = { inicio: 1, envios: 1, evaluados: 1, revisar: 1, publicar: 1, evaluaciones: 1, bandeja: 1 };
+  const MEM = new Map();
+  const claveDe = (accion, datos) => { const d = { ...datos }; delete d.forzar; return accion + '|' + JSON.stringify(d); };
+  let redibujo = null;
+  function cambioPorDetras() {
+    clearTimeout(redibujo);
+    redibujo = setTimeout(() => {
+      const r = location.hash.replace(/^#/, '').split('/')[0] || 'inicio';
+      const ocupado = !$('#modal').hidden || (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) || $('.panel-notif, .menu');
+      if (RUTAS_VIVAS[r] && !ocupado) ruta(true);
+    }, 250);
+  }
+  function precargar(accion, datos) {
+    const k = claveDe(accion, datos); const g = MEM.get(k); if (g && Date.now() - g.t < 20000) return;
+    API.llamar(accion, { token: S.token, ...datos }).then(r => MEM.set(k, { t: Date.now(), r })).catch(() => { });
+  }
+  document.addEventListener('pointerover', e => {
+    const a = e.target.closest && e.target.closest('a[href^="#envio/"], a[href^="#evaluacion/"], a[href^="#hilo/"], a[href^="#corregir/"]'); if (!a || !S.token) return;
+    const [r, ...x] = a.getAttribute('href').slice(1).split('/'); const id = decodeURIComponent(x.join('/'));
+    if (r === 'envio' || r === 'corregir') precargar('envio', { id }); else if (r === 'evaluacion') precargar('evaluacion', { id }); else if (r === 'hilo') precargar('hilo', { hiloId: id });
+  }, { passive: true });
   async function api(accion, datos = {}) {
-    try { return await API.llamar(accion, { token: S.token, ...datos }); }
+    try {
+      const k = claveDe(accion, datos);
+      if (LISTAS[accion]) {
+        const g = datos.forzar ? null : MEM.get(k);
+        const fresco = API.llamar(accion, { token: S.token, ...datos }).then(r => {
+          const antes = MEM.get(k); MEM.set(k, { t: Date.now(), r });
+          if (g && antes && JSON.stringify(antes.r) !== JSON.stringify(r)) cambioPorDetras();
+          return r;
+        });
+        if (g) { fresco.catch(() => { }); return g.r; }
+        return await fresco;
+      }
+      if (DETALLE[accion]) { const g = MEM.get(k); MEM.delete(k); if (g && Date.now() - g.t < 20000 && !datos.forzar) return g.r; }
+      const r = await API.llamar(accion, { token: S.token, ...datos });
+      if (!SOLO_LECTURA[accion]) MEM.clear();
+      return r;
+    }
     catch (e) {
       if (e.sesion === false) { S.token = null; S.usuario = null; guardarSesion(); location.hash = '#entrar'; }
       throw e;
@@ -115,7 +159,7 @@
   async function actualizarNotificaciones() {
     if (!S.token) return;
     try {
-      const [n, r] = await Promise.all([api('notificaciones'), api('resumen')]);
+      let n, r; try { n = r = await api('pulso'); } catch (e) { [n, r] = await Promise.all([api('notificaciones'), api('resumen')]); }
       const antes = S.notif.sinLeer; S.notif = { lista: n.notificaciones, sinLeer: n.sinLeer }; S.resumen = r.resumen;
       const c = $('[data-campana]'); if (c) c.innerHTML = svgCampana + (n.sinLeer ? `<span class="num">${n.sinLeer > 99 ? '99+' : n.sinLeer}</span>` : '');
       $$('.pestana').forEach(a => { const p = pestanas().find(x => '#' + x[0] === a.getAttribute('href')); if (p) a.innerHTML = p[1] + (p[2] ? `<span class="num">${p[2]}</span>` : ''); });
@@ -138,18 +182,20 @@
 
   // ---------- Rutas ----------
   const RUTAS = {};
-  async function ruta() {
-    cerrarFlotantes(); $('#modal').hidden = true; quitarHerramientas();
+  async function ruta(suave) {
+    suave = suave === true; const y = window.scrollY;
+    if (!suave) { cerrarFlotantes(); $('#modal').hidden = true; quitarHerramientas(); }
     const h = location.hash.replace(/^#/, '') || 'inicio';
     const [nombre, ...resto] = h.split('/'); const arg = resto.join('/');
     if (!S.token || !S.usuario) return vistaEntrar();
     if (S.usuario.debeCambiar && nombre !== 'cuenta') { location.hash = '#cuenta'; return; }
     const fn = RUTAS[nombre] || RUTAS.inicio;
-    app.innerHTML = marco('<p class="suave">Cargando…</p>', nombre); conectarMarco();
-    try { const html = await fn.render(arg); if (location.hash.replace(/^#/, '').split('/')[0] !== nombre && nombre !== 'inicio') return; app.innerHTML = marco(html, nombre); conectarMarco(); if (fn.conectar) await fn.conectar(arg); window.scrollTo(0, 0); }
-    catch (e) { app.innerHTML = marco(`<div class="vacio"><span class="mano">Algo salió mal</span>${esc(e.message)}</div>`, nombre); conectarMarco(); }
+    // «Cargando…» solo si de verdad tarda: lo que ya estaba en memoria aparece sin parpadeo
+    const espera = suave ? null : setTimeout(() => { app.innerHTML = marco('<p class="suave">Cargando…</p>', nombre); conectarMarco(); }, 180);
+    try { const html = await fn.render(arg); clearTimeout(espera); if (location.hash.replace(/^#/, '').split('/')[0] !== nombre && nombre !== 'inicio') return; app.innerHTML = marco(html, nombre); conectarMarco(); if (fn.conectar) await fn.conectar(arg); window.scrollTo(0, suave ? y : 0); }
+    catch (e) { clearTimeout(espera); app.innerHTML = marco(`<div class="vacio"><span class="mano">Algo salió mal</span>${esc(e.message)}</div>`, nombre); conectarMarco(); }
   }
-  window.addEventListener('hashchange', ruta);
+  window.addEventListener('hashchange', () => ruta());
 
   // ---------- Entrar ----------
   async function vistaEntrar() {
@@ -233,8 +279,8 @@
   RUTAS.bandeja = {
     render: async () => {
       let todo = false; try { todo = localStorage.getItem('redaccion-correo-todo') === '1'; } catch (e) { }
-      const r = await api('bandeja', { todo });
-      return `<div class="cabecera"><div><p class="meta">Gmail de la gaceta</p><h1>Correo</h1></div><button class="btn btn--chico" onclick="location.reload()">Actualizar</button></div>
+      const r = await api('bandeja', S._forzarCorreo ? { todo, forzar: true } : { todo }); S._forzarCorreo = false;
+      return `<div class="cabecera"><div><p class="meta">Gmail de la gaceta</p><h1>Correo</h1></div><button class="btn btn--chico" data-actualizar-correo>Actualizar</button></div>
       <div class="modo" role="group" aria-label="Qué correos ver" style="margin-bottom:.6rem"><button data-filtro="docs" aria-pressed="${!todo}">📄 Solo documentos</button><button data-filtro="todo" aria-pressed="${todo}">Todo el correo</button></div>
       <p class="suave" style="font-size:.88rem;margin:0 0 1rem">${todo ? 'Estás viendo todo el correo de la gaceta.' : 'Solo aparecen los correos que traen documentos adjuntos (Word, PDF…): los envíos de textos. El resto sigue en Gmail.'}</p>
       ${r.hilos.length ? `<ul class="lista">${r.hilos.map(h => `<li><a class="fila ${h.noLeido ? 'nuevo' : ''}" href="#hilo/${encodeURIComponent(h.hiloId)}">
@@ -243,7 +289,7 @@
         ${h.adjuntos.length ? `<div class="meta" style="margin-top:.3rem">📎 ${h.adjuntos.length} adjunto(s)</div>` : ''}</div>
         ${h.envioId ? `<span class="estado e-listo_publicar">${esc(h.envioId)}</span>` : (h.adjuntos.length ? '<span class="estado e-por_asignar">Sin registrar</span>' : '')}</a></li>`).join('')}</ul>` : `<div class="vacio">${todo ? 'No hay correos.' : '<span class="mano">Nada nuevo</span>No hay correos con documentos adjuntos.'}</div>`}`;
     },
-    conectar: () => $$('[data-filtro]').forEach(b => b.onclick = () => { try { localStorage.setItem('redaccion-correo-todo', b.dataset.filtro === 'todo' ? '1' : '0'); } catch (e) { } ruta(); }),
+    conectar: () => { const ac = $('[data-actualizar-correo]'); if (ac) ac.onclick = () => { S._forzarCorreo = true; ac.disabled = true; ac.textContent = 'Buscando…'; ruta(true); }; $$('[data-filtro]').forEach(b => b.onclick = () => { try { localStorage.setItem('redaccion-correo-todo', b.dataset.filtro === 'todo' ? '1' : '0'); } catch (e) { } ruta(); }); },
   };
   RUTAS.hilo = {
     render: async id => {
@@ -416,12 +462,15 @@
       const entregadas = e.asignaciones.filter(a => a.estado === 'entregada');
       const acciones = [];
       if (aux) {
-        if (['por_asignar', 'tercer_evaluador', 'devuelto', 'en_evaluacion'].includes(e.estado)) acciones.push(`<button class="btn btn--rojo" data-asignar>${e.estado === 'tercer_evaluador' ? 'Asignar tercer evaluador' : 'Asignar evaluadores'}</button>`);
+        const faltanEv = (e.estado === 'tercer_evaluador' ? 3 : 2) - e.asignaciones.filter(a => +a.ronda === +e.ronda).length;
+        if (['por_asignar', 'tercer_evaluador', 'devuelto', 'en_evaluacion'].includes(e.estado) && faltanEv > 0) acciones.push(`<button class="btn btn--rojo" data-asignar>${e.estado === 'tercer_evaluador' ? 'Asignar tercer evaluador' : faltanEv === 1 ? 'Asignar el segundo evaluador' : 'Asignar evaluadores'}</button>`);
         const tipoAviso = { ajustes: 'ajustes', aceptado: 'aceptado', no_aceptado: 'no', correcciones_directora: 'directora' }[e.estado];
         if (e.estado === 'aprobado') acciones.push('<button class="btn btn--verde" data-plataforma>Enviar a plataforma</button>');
         acciones.push(`<button class="btn ${tipoAviso ? 'btn--ama' : ''}" data-escribir="${tipoAviso || ''}">${tipoAviso ? 'Avisar al autor' : 'Escribir al autor'}</button>`);
         if (['esperando_autor', 'ajustes', 'devuelto', 'version_recibida'].includes(e.estado)) acciones.push(`<button class="btn" data-subir-version>${e.estado === 'version_recibida' ? 'Subir otra versión' : 'Subir versión corregida'}</button>`);
-        if (['esperando_autor', 'devuelto', 'version_recibida'].includes(e.estado)) acciones.push('<button class="btn btn--claro" data-mover="directora">Enviar a la Directora</button><button class="btn" data-mover="nueva_ronda">Nueva ronda de evaluación</button>');
+        const deAjustes = e.decision === 'ajustes' && !(e.dirCorr && e.dirCorr.fecha && !e.dirCorr.aplicadas);
+        if (deAjustes && ['esperando_autor', 'version_recibida'].includes(e.estado)) acciones.push('<button class="btn btn--claro" data-mover="nueva_ronda">Enviar a nueva evaluación</button>');
+        else if (['esperando_autor', 'devuelto', 'version_recibida'].includes(e.estado)) acciones.push('<button class="btn btn--claro" data-mover="directora">Enviar a la Directora</button><button class="btn" data-mover="nueva_ronda">Nueva ronda de evaluación</button>');
         if (['aceptada', 'ajustes', 'no'].includes(e.decision) && !['listo_publicar', 'publicado'].includes(e.estado)) acciones.push('<button class="btn btn--chico" data-cambiar-res>Cambiar resultado</button>');
         acciones.push('<button class="btn btn--chico" data-editar>Editar datos</button>');
       }
@@ -432,9 +481,9 @@
       return `<div class="migas"><a href="#${aux ? (DICT[e.decision] ? 'evaluados' : 'envios') : dir ? 'revisar' : 'publicar'}">${aux ? (DICT[e.decision] ? 'Textos evaluados' : 'Envíos') : dir ? 'Para revisar' : 'Listos para publicar'}</a> › ${esc(e.id)}</div>
       <div class="cabecera"><div><p class="meta">${esc(e.id)} · ${esc(e.genero || 'sin género')}${e.ronda > 1 ? ` · ronda ${e.ronda}` : ''}</p><h1>${esc(e.titulo)}</h1>${estadoChip(e.estado, e.estadoTexto)}</div></div>
       ${e.nota && e.estado === 'devuelto' ? `<div class="tarjeta" style="border-color:var(--canaguate)"><p class="meta">Nota de la Directora</p><p style="margin:0">${esc(e.nota)}</p></div>` : ''}
-      ${aux && e.respondio ? `<div class="tarjeta" style="border-color:var(--buchon)"><b>📩 La autora respondió con un documento.</b> Ábrelo en el correo y pulsa <b>Usar como versión</b>; después, <b>Enviar a la Directora</b>.<div class="botones" style="margin-top:.6rem"><a class="btn btn--verde" href="#hilo/${encodeURIComponent(e.hiloId)}">Abrir el correo</a></div></div>` : ''}
-      ${aux && e.estado === 'version_recibida' ? `<div class="tarjeta" style="border-color:var(--buchon)"><b>✓ Versión corregida guardada (versión ${(e.versiones || []).length}).</b> Revísala en «Archivos» y pulsa <b>Enviar a la Directora</b> para que la apruebe.</div>` : ''}
-      ${dir && e.estado === 'revision_directora' && (e.versiones || []).length > 1 ? `<div class="tarjeta" style="border-color:var(--acento)"><b>Esta es la versión corregida</b> (versión ${(e.versiones || []).length}) que mandó la autora después de ${e.dirCorr && e.dirCorr.fecha ? 'tus correcciones' : 'los ajustes de los evaluadores'}. Si está bien, pulsa <b>Aprobar para publicar</b>: pasará a «Aprobados para publicar» y la Auxiliar la enviará a plataforma. Las versiones anteriores siguen en «Archivos».</div>` : ''}
+      ${aux && e.respondio ? `<div class="tarjeta" style="border-color:var(--buchon)"><b>📩 La autora respondió con un documento.</b> Ábrelo en el correo y pulsa <b>Usar como versión</b>; después, <b>${e.decision === 'ajustes' && !(e.dirCorr && e.dirCorr.fecha && !e.dirCorr.aplicadas) ? 'Enviar a nueva evaluación' : 'Enviar a la Directora'}</b>.<div class="botones" style="margin-top:.6rem"><a class="btn btn--verde" href="#hilo/${encodeURIComponent(e.hiloId)}">Abrir el correo</a></div></div>` : ''}
+      ${aux && e.estado === 'version_recibida' ? `<div class="tarjeta" style="border-color:var(--buchon)"><b>✓ Versión corregida guardada (versión ${(e.versiones || []).length}).</b> ${e.decision === 'ajustes' && !(e.dirCorr && e.dirCorr.fecha && !e.dirCorr.aplicadas) ? 'Revísala en «Archivos» y pulsa <b>Enviar a nueva evaluación</b>: la evalúan otra vez dos evaluadores (pueden ser los mismos) y, si la aceptan, pasa a la Directora.' : 'Revísala en «Archivos» y pulsa <b>Enviar a la Directora</b> para que la apruebe.'}</div>` : ''}
+      ${dir && e.estado === 'revision_directora' && (e.versiones || []).length > 1 ? `<div class="tarjeta" style="border-color:var(--acento)"><b>Esta es la versión corregida</b> (versión ${(e.versiones || []).length}) que mandó la autora después de ${e.dirCorr && e.dirCorr.fecha ? 'tus correcciones' : 'los ajustes de los evaluadores, y que ya volvió a ser evaluada y aceptada'}. Si está bien, pulsa <b>Aprobar para publicar</b>: pasará a «Aprobados para publicar» y la Auxiliar la enviará a plataforma. Las versiones anteriores siguen en «Archivos».</div>` : ''}
       ${acciones.length ? `<div class="botones" style="margin-bottom:1.4rem">${acciones.join('')}</div>` : ''}
       <div class="dos"><div>
         ${e.dirCorr && e.dirCorr.fecha ? `<div class="tarjeta" style="border-color:var(--acento)"><p class="meta">Correcciones de la Directora · versión ${e.dirCorr.version} · ${fecha(e.dirCorr.fecha)}</p>${e.dirCorr.aplicadas ? '<p style="margin:.2rem 0 .5rem"><b>✓ Aplicadas en el texto final</b> (la última versión en «Archivos»).</p>' : ''}${e.dirCorr.nota ? `<p style="white-space:pre-wrap">${esc(e.dirCorr.nota)}</p>` : ''}<div class="botones">${e.dirCorr.anotaciones.length ? `<button class="btn btn--chico btn--claro" data-ver-dir>Ver correcciones (${e.dirCorr.anotaciones.length})</button>` : ''}${e.dirCorr.archivoId ? '<button class="btn btn--chico" data-archivo="directora">Texto corregido en Word</button>' : ''}</div></div>` : ''}
@@ -468,7 +517,7 @@
       const es = $('[data-escribir]'); if (es) es.onclick = () => modalEscribir(e, es.dataset.escribir);
       const sv = $('[data-subir-version]'); if (sv) sv.onclick = () => modalVersion(e);
       const ed = $('[data-editar]'); if (ed) ed.onclick = () => modalEditar(e);
-      $$('[data-mover]').forEach(b => b.onclick = async () => { try { await api('moverEnvio', { envioId: e.id, a: b.dataset.mover }); toast(b.dataset.mover === 'directora' ? 'Enviado a la Directora' : 'Lista para una nueva ronda'); ruta(); } catch (er) { toast(er.message, true); } });
+      $$('[data-mover]').forEach(b => b.onclick = async () => { try { await api('moverEnvio', { envioId: e.id, a: b.dataset.mover }); toast(b.dataset.mover === 'directora' ? 'Enviado a la Directora' : 'Lista para nueva evaluación: asigna los dos evaluadores'); ruta(); } catch (er) { toast(er.message, true); } });
       $$('[data-decidir]').forEach(b => b.onclick = () => {
         const confirma = b.dataset.decidir === 'confirmar';
         modal(`<h2>${confirma ? 'Aprobar para publicar' : 'Devolver a la Auxiliar'}</h2><p class="suave">${confirma ? 'La Auxiliar le avisará al autor y luego enviará el texto final, con la ficha y la licencia, a plataforma.' : 'Explica qué falta o qué debe revisarse.'}</p><label class="campo"><span>Nota ${confirma ? '(opcional)' : ''}</span><textarea name="nota"></textarea></label><div class="botones"><button class="btn ${confirma ? 'btn--verde' : 'btn--rojo'}" data-si>${confirma ? 'Aprobar' : 'Devolver'}</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
@@ -570,12 +619,20 @@
     const ya = e.asignaciones.filter(a => +a.ronda === +e.ronda).map(a => a.evaluadorId);
     const sel = new Set();
     const sugerida = e.rubrica || rubricaDeGenero(e.genero);
-    modal(`<h2>${e.estado === 'tercer_evaluador' ? 'Tercer evaluador' : 'Asignar evaluadores'}</h2><p class="suave">${e.estado === 'tercer_evaluador' ? 'Los dos evaluadores no coinciden: elige una persona más.' : 'Elige dos personas. Solo verán el texto, sin datos del autor.'}</p>
+    const tercero = e.estado === 'tercer_evaluador', faltan = Math.max(0, (tercero ? 3 : 2) - ya.length);
+    if (!faltan) return toast('Este envío ya tiene sus dos evaluadores.', true);
+    const cuenta = () => `${sel.size} de ${faltan} elegido${faltan === 1 ? '' : 's'}`;
+    modal(`<h2>${tercero ? 'Tercer evaluador' : faltan === 1 ? 'Segundo evaluador' : 'Asignar evaluadores'}</h2><p class="suave">${tercero ? 'Los dos evaluadores no coinciden: elige <b>una</b> persona más para desempatar.' : faltan === 1 ? 'Ya hay un evaluador asignado: elige <b>uno</b> más para completar dos.' : 'Elige <b>exactamente dos</b> personas. Solo verán el texto, sin datos del autor.'}</p>
       <label class="campo"><span>Rúbrica</span><select name="rubrica">${S.rubricas.map(r => `<option value="${r.clave}" ${sugerida === r.clave ? 'selected' : ''}>${esc(r.nombre)}</option>`).join('')}</select></label>
       <span class="meta">Evaluadores</span><div class="chips" style="margin:.5rem 0 1rem">${evaluadores.map(v => `<button type="button" class="chip" data-ev="${esc(v.id)}" aria-pressed="false" ${ya.includes(v.id) ? 'disabled title="Ya asignado"' : ''}>${esc(v.nombre)}${ya.includes(v.id) ? ' ✓' : ''}</button>`).join('')}</div>
+      <p class="meta" data-cuenta-ev style="margin:-.4rem 0 1rem">${cuenta()}</p>
       <div class="botones"><button class="btn btn--rojo" data-si>Asignar</button><button class="btn" data-cerrar>Cancelar</button></div>`, (m, cerrar) => {
-      $$('[data-ev]', m).forEach(b => b.onclick = () => { const v = b.dataset.ev; sel.has(v) ? sel.delete(v) : sel.add(v); b.setAttribute('aria-pressed', sel.has(v)); });
-      $('[data-si]', m).onclick = async () => { if (!sel.size) return toast('Elige al menos un evaluador.', true); try { await api('asignar', { envioId: e.id, evaluadores: [...sel], rubrica: $('[name=rubrica]', m).value }); cerrar(); toast('Asignado. Les llegó el aviso.'); ruta(); } catch (er) { toast(er.message, true); } };
+      $$('[data-ev]', m).forEach(b => b.onclick = () => {
+        const v = b.dataset.ev;
+        if (!sel.has(v) && sel.size >= faltan) return toast(faltan === 1 ? 'Solo puedes elegir uno. Quita el que marcaste para cambiarlo.' : 'Ya elegiste dos. Quita uno para cambiarlo.', true);
+        sel.has(v) ? sel.delete(v) : sel.add(v); b.setAttribute('aria-pressed', sel.has(v)); $('[data-cuenta-ev]', m).textContent = cuenta();
+      });
+      $('[data-si]', m).onclick = async () => { if (sel.size !== faltan) return toast(tercero ? 'Elige un evaluador: el tercero.' : faltan === 2 ? 'Elige exactamente dos evaluadores.' : 'Elige uno más para completar dos.', true); try { await api('asignar', { envioId: e.id, evaluadores: [...sel], rubrica: $('[name=rubrica]', m).value }); cerrar(); toast('Asignado. Les llegó el aviso.'); ruta(); } catch (er) { toast(er.message, true); } };
     });
   }
   async function modalEscribir(e, tipo) {
@@ -707,11 +764,34 @@
   };
   function pintarCorrDirectora() {
     const z = $('#zona-corr'); if (!z) return;
-    z.innerHTML = `<div class="ayuda"><b>Cómo funciona:</b> marca tus correcciones igual que en Word: selecciona una palabra o frase y elige <b>Comentar</b>, <b>Tachar</b> o <b>Cambiar por…</b>, o toca un punto para <b>Insertar</b>. Al terminar, elige: <b>Enviar a la Auxiliar</b> (la autora revisa tus correcciones y responde) o <b>Corregir y aprobar para publicar</b> (tus correcciones se aplican y la obra sigue a plataforma con el texto final corregido).</div>
+    const bw = E.wordSubido ? `<div class="tarjeta" style="border-color:var(--acento)"><b>✓ Correcciones tomadas de tu Word</b> (${esc(E.wordNombre || '')}): ${E.resumenWord.cambios} cambio(s) y ${E.resumenWord.comentarios} comentario(s)${E.resumenWord.controlDeCambios ? ', leídos del control de cambios' : ', encontrados comparando tu Word con el original (no tenía control de cambios activado)'}. Revísalas abajo: puedes ajustarlas aquí mismo antes de enviar.</div>` : '';
+    z.innerHTML = `<div class="tarjeta word-dir"><h3 style="margin-top:0">¿Prefieres corregir en Word?</h3>
+        <ol class="pasos-word"><li><button class="btn btn--chico" data-bajar-word>Descargar la obra en Word</button></li>
+        <li>Ábrela en Word y activa <b>Revisar › Control de cambios</b>. Corrige y deja comentarios como siempre, y guarda el archivo.</li>
+        <li><label class="btn btn--chico btn--rojo" style="cursor:pointer">Subir mi Word corregido<input type="file" accept=".docx" data-subir-word hidden></label> <span class="meta">La página detecta tus cambios y comentarios.</span></li></ol></div>
+      ${bw}
+      <div class="ayuda"><b>Cómo funciona:</b> marca tus correcciones igual que en Word: selecciona una palabra o frase y elige <b>Comentar</b>, <b>Tachar</b> o <b>Cambiar por…</b>, o toca un punto para <b>Insertar</b>. Al terminar, elige: <b>Enviar a la Auxiliar</b> (la autora revisa tus correcciones y responde) o <b>Corregir y aprobar para publicar</b> (tus correcciones se aplican y la obra sigue a plataforma con el texto final corregido).</div>
       ${E.textoError ? `<div class="vacio">${esc(E.textoError)}</div>` : `<div class="corrector"><div class="hoja" id="hoja">${pintarHoja(E.parrafos, E.anotaciones)}</div><aside class="margen" id="margen">${listaNotas(E.parrafos, E.anotaciones, true)}</aside></div>`}
       <label class="campo" style="margin-top:1rem"><span>Nota general para la autora (opcional)</span><textarea data-nota-dir>${esc(E.nota)}</textarea></label>
       <div class="resultado"><span class="meta" data-guardado>${E.anotaciones.length} corrección(es)</span><span style="flex:1"></span>${E.parrafos && E.anotaciones.length ? '<button class="btn" data-previa>Ver en Word</button>' : ''}<button class="btn" data-enviar-dir>Enviar a la Auxiliar (la autora revisa)</button><button class="btn btn--verde" data-corr-aprobar>Corregir y aprobar para publicar</button></div>`;
     conectarHoja();
+    $('[data-bajar-word]').onclick = () => descargarArchivo({ envioId: E.env.id, cual: 'version', n: E.version }, `${E.env.id} · ${E.env.titulo} · para corregir.docx`);
+    $('[data-subir-word]').onchange = async ev => {
+      const f = ev.target.files[0]; ev.target.value = ''; if (!f) return;
+      if (!/\.docx$/i.test(f.name)) return toast('Guárdalo como Word .docx (Archivo › Guardar como › Documento de Word).', true);
+      if (!E.parrafos) return toast('La obra original no es un Word, así que no se pueden comparar las correcciones.', true);
+      try {
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        const r = await Docx.leerCorrecciones(bytes, E.parrafos);
+        if (!r.anotaciones.length) return toast('No encontramos cambios ni comentarios en ese Word. ¿Subiste el archivo correcto?', true);
+        if (E.anotaciones.length && !await confirmar('¿Reemplazar tus correcciones?', `Ya tienes ${E.anotaciones.length} corrección(es) hechas aquí. Se reemplazarán por las ${r.anotaciones.length} de tu Word.`, 'Reemplazar')) return;
+        E.anotaciones = r.anotaciones; E.wordSubido = Docx.aBase64(bytes); E.wordNombre = f.name; E.resumenWord = r.resumen; E.firmaWord = JSON.stringify(E.anotaciones);
+        guardarBorradorPronto(); pintarCorrDirectora();
+        toast(`Detectamos ${r.resumen.cambios} cambio(s) y ${r.resumen.comentarios} comentario(s) ✓`);
+      } catch (er) { toast('No se pudo leer ese Word: ' + er.message, true); }
+    };
+    // Si las correcciones vienen tal cual de su Word, se guarda su propio archivo (con sus marcas de Word)
+    const wordPropio = () => E.wordSubido && JSON.stringify(E.anotaciones) === E.firmaWord ? E.wordSubido : null;
     const t = $('[data-nota-dir]'); t.oninput = () => { E.nota = t.value; guardarBorradorPronto(); };
     const pv = $('[data-previa]'); if (pv) pv.onclick = async () => descargar(`${E.env.id} · correcciones de la Dirección.docx`, await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
     $('[data-corr-aprobar]').onclick = async () => {
@@ -721,7 +801,7 @@
       if (!await confirmar('¿Corregir y aprobar para publicar?', `Tus ${E.anotaciones.length} corrección(es) se aplican al texto y queda un <b>texto final ya corregido</b>. La Auxiliar le avisa a la autora y lo envía a plataforma; Sebastian recibe el texto final y el Word con tus correcciones marcadas.<br><br><span class="suave">Los comentarios no cambian el texto: quedan solo en el Word de correcciones.</span>`, 'Corregir y aprobar')) return;
       try {
         const d = { envioId: E.env.id, decision: 'corregirAprobar', anotaciones: E.anotaciones, nota: E.nota };
-        d.correccionDocx = Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
+        d.correccionDocx = wordPropio() || Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
         d.finalDocx = Docx.aBase64(await Docx.desdeTexto(final.join('\n')));
         await api('decidir', d); clearTimeout(tBorrador); E = null; toast('Aprobada con tus correcciones ✓'); location.hash = '#envio/' + d.envioId;
       } catch (er) { toast(er.message, true); }
@@ -731,7 +811,7 @@
       if (!await confirmar('¿Enviar las correcciones?', `${E.anotaciones.length} corrección(es). La Auxiliar recibe el aviso y se las manda a la autora; cuando ella responda con la versión final, el texto vuelve a ti.`, 'Enviar')) return;
       try {
         const d = { envioId: E.env.id, decision: 'corregir', anotaciones: E.anotaciones, nota: E.nota };
-        if (E.anotaciones.length && E.parrafos) d.correccionDocx = Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
+        if (E.anotaciones.length && E.parrafos) d.correccionDocx = wordPropio() || Docx.aBase64(await Docx.crearCorregido({ parrafos: E.parrafos, anotaciones: E.anotaciones, autor: 'Dirección editorial · Hicimos lo que quisimos', iniciales: 'DE', titulo: `${E.env.id} · ${E.env.titulo}` }));
         await api('decidir', d); clearTimeout(tBorrador); E = null; toast('Correcciones enviadas a la Auxiliar'); location.hash = '#envio/' + d.envioId;
       } catch (er) { toast(er.message, true); }
     };
@@ -1056,12 +1136,12 @@
       return `<div style="max-width:620px"><p class="meta">Administración</p><h1>Ajustes</h1><form class="tarjeta" id="f-aj">
         <label class="campo"><span>Dirección de esta página (para los enlaces de los avisos)</span><input type="url" name="urlPagina" value="${esc(a.urlPagina || location.href.split('#')[0])}"></label>
         <label class="campo"><span>Nombre que aparece en los correos</span><input type="text" name="nombreRemitente" value="${esc(a.nombreRemitente)}"></label>
-        <label class="campo"><span>Recordar a los evaluadores cada cuántos días</span><input type="number" min="1" max="60" name="diasRecordatorio" value="${esc(a.diasRecordatorio)}"></label>
+        <label class="campo"><span>Recordar las tareas pendientes (evaluadores, Directora y Auxiliar) cada cuántos días</span><input type="number" min="1" max="60" name="diasRecordatorio" value="${esc(a.diasRecordatorio)}"></label>
         <label class="chequeo"><input type="checkbox" name="avisosActivos" ${String(a.avisosActivos) !== 'false' ? 'checked' : ''}> Mandar avisos por correo (la campanita funciona siempre)</label>
         <button class="btn btn--rojo" style="margin-top:1rem">Guardar</button></form>
         <p class="suave">Versión ${API.demo ? 'de demostración' : 'conectada al Gmail de la gaceta'}.</p></div>`;
     },
-    conectar: () => $('#f-aj').onsubmit = async e => { e.preventDefault(); const f = e.target; try { await api('guardarAjustes', { ajustes: { urlPagina: f.urlPagina.value, nombreRemitente: f.nombreRemitente.value, diasRecordatorio: +f.diasRecordatorio.value || 7, avisosActivos: f.avisosActivos.checked } }); toast('Ajustes guardados'); } catch (er) { toast(er.message, true); } },
+    conectar: () => { $('#f-aj').onsubmit = async e => { e.preventDefault(); const f = e.target; try { await api('guardarAjustes', { ajustes: { urlPagina: f.urlPagina.value, nombreRemitente: f.nombreRemitente.value, diasRecordatorio: +f.diasRecordatorio.value || 7, avisosActivos: f.avisosActivos.checked } }); toast('Ajustes guardados'); } catch (er) { toast(er.message, true); } }; },
   };
 
   // ---------- Arranque ----------

@@ -314,8 +314,142 @@
   const aBase64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   const deBase64 = b64 => { const s = atob(b64); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
   // Un .docx sencillo a partir de texto (para pruebas y para textos pegados en el correo)
+  // ---------- Leer las correcciones que alguien hizo en Word ----------
+  // Compara el Word corregido con el texto original y devuelve anotaciones con el mismo formato
+  // que usa el corrector de la página: {tipo: borrar|reemplazar|insertar|comentario, p, ini, fin, nuevo, comentario}.
+  // Lee el control de cambios (w:ins / w:del) y los comentarios; si no hay control de cambios, compara palabra por palabra.
+  async function leerCorrecciones(bytes, original) {
+    const zip = await leerZip(bytes);
+    const xml = await zip.texto('word/document.xml');
+    if (!xml) throw new Error('El archivo no tiene texto de Word.');
+    const comXml = (await zip.texto('word/comments.xml')) || '';
+    const textoDeRuns = x => { let t = ''; const re = /<w:(?:t|delText)(?:\s[^>]*)?>([\s\S]*?)<\/w:(?:t|delText)>|<w:tab\/>|<w:br(?:\s[^>]*)?\/>/g; let q; while ((q = re.exec(x))) t += q[0].startsWith('<w:tab') ? '\t' : q[0].startsWith('<w:br') ? '\n' : desXml(q[1]); return t; };
+    const comentarios = {};
+    const reC = /<w:comment\s[^>]*w:id="(\d+)"[^>]*>([\s\S]*?)<\/w:comment>/g; let mc;
+    while ((mc = reC.exec(comXml))) comentarios[mc[1]] = mc[2].split(/<\/w:p>/).map(textoDeRuns).filter(Boolean).join('\n').trim();
+    const cuerpo = xml.slice(xml.indexOf('<w:body'), xml.lastIndexOf('</w:body>'));
+    const pars = []; const reP = /<w:p\/>|<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g; let m;
+    let hayCambios = false;
+    while ((m = reP.exec(cuerpo))) {
+      const px = m[0];
+      const pPr = (px.match(/<w:pPr>[\s\S]*?<\/w:pPr>/) || [''])[0];
+      const marcaIns = /<w:rPr>[\s\S]*?<w:ins\b[\s\S]*?<\/w:rPr>/.test(pPr); // párrafo nuevo (Enter con control de cambios)
+      const piezas = []; // {k: 'n'|'i'|'d', t} y marcas de comentario {c: id, ab: true|false}
+      const sin = px.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/, '');
+      const reX = /<w:(?:ins|moveTo)\b[^>]*>([\s\S]*?)<\/w:(?:ins|moveTo)>|<w:(?:del|moveFrom)\b[^>]*>([\s\S]*?)<\/w:(?:del|moveFrom)>|<w:commentRangeStart\b[^>]*w:id="(\d+)"[^>]*\/>|<w:commentRangeEnd\b[^>]*w:id="(\d+)"[^>]*\/>|<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g; let x;
+      while ((x = reX.exec(sin))) {
+        if (x[1] !== undefined) { const t = textoDeRuns(x[1]); if (t) { piezas.push({ k: 'i', t }); hayCambios = true; } }
+        else if (x[2] !== undefined) { const t = textoDeRuns(x[2]); if (t) { piezas.push({ k: 'd', t }); hayCambios = true; } }
+        else if (x[3] !== undefined) piezas.push({ c: x[3], ab: true });
+        else if (x[4] !== undefined) piezas.push({ c: x[4], ab: false });
+        else { if (/<w:commentReference\b/.test(x[0])) continue; const t = textoDeRuns(x[0]); if (t) piezas.push({ k: 'n', t }); }
+      }
+      pars.push({ piezas, marcaIns });
+    }
+    // Unir párrafos cuyo salto fue insertado: el salto es una inserción de «\n» dentro del párrafo original
+    const unidos = [];
+    for (const p of pars) {
+      const u = unidos[unidos.length - 1];
+      if (u && u.abierto) { u.piezas.push({ k: 'i', t: '\n' }, ...p.piezas); u.abierto = p.marcaIns; hayCambios = true; }
+      else unidos.push({ piezas: p.piezas.slice(), abierto: p.marcaIns });
+    }
+    const vacio = p => !p.piezas.some(z => z.k === 'n' || z.k === 'd');
+    // El texto original de cada párrafo (normal + borrado) debe coincidir con la versión que se corrigió
+    let propios = unidos.filter(p => !(vacio(p) && p.piezas.every(z => z.k !== 'i')));
+    const origDe = p => p.piezas.filter(z => z.k === 'n' || z.k === 'd').map(z => z.t).join('');
+    const finalDe = p => p.piezas.filter(z => z.k === 'n' || z.k === 'i').map(z => z.t).join('');
+    const norm = t => String(t).replace(/\s+/g, ' ').trim();
+    const orig = original.map(p => p.texto);
+    const anotaciones = [];
+    // Emparejar párrafos del Word con los originales (por texto original), dejando que haya párrafos nuevos o vacíos
+    const pares = emparejar(orig.map(norm), propios.map(p => norm(hayCambios ? origDe(p) : finalDe(p))));
+    let nuevosAntes = '';
+    pares.forEach(([oi, wi]) => {
+      if (oi === null) { const fp = propios[wi]; const t = finalDe(fp); if (t.trim()) nuevosAntes += (nuevosAntes ? '\n' : '') + t; return; }
+      if (wi === null) { if (orig[oi].trim()) anotaciones.push({ tipo: 'borrar', p: oi, ini: 0, fin: orig[oi].length }); return; }
+      const wp = propios[wi];
+      if (nuevosAntes) { anotaciones.push({ tipo: 'insertar', p: oi, ini: 0, nuevo: nuevosAntes + '\n' }); nuevosAntes = ''; }
+      if (hayCambios) delCambios(wp, oi); else delDiff(orig[oi], finalDe(wp), oi, wp);
+    });
+    if (nuevosAntes && orig.length) { const ult = orig.length - 1; anotaciones.push({ tipo: 'insertar', p: ult, ini: orig[ult].length, nuevo: '\n' + nuevosAntes }); }
+    // Con control de cambios: recorrer las piezas y convertirlas en anotaciones sobre el texto original
+    function delCambios(wp, pi) {
+      const base = orig[pi]; let pos = 0; const abiertos = {};
+      const pz = wp.piezas;
+      // ajustar si el texto original del Word no coincide exactamente (espacios): se usa la posición en el Word
+      for (let i = 0; i < pz.length; i++) {
+        const z = pz[i];
+        if (z.c !== undefined) { if (z.ab) abiertos[z.c] = pos; else { const ini = abiertos[z.c] ?? pos; agregarComentario(pi, ini, pos, comentarios[z.c] || ''); } continue; }
+        if (z.k === 'n') { pos += z.t.length; continue; }
+        if (z.k === 'd') {
+          const ini = pos; pos += z.t.length;
+          let j = i + 1; while (j < pz.length && pz[j].c !== undefined) j++;
+          if (j < pz.length && pz[j].k === 'i') { anotaciones.push({ tipo: 'reemplazar', p: pi, ini, fin: pos, nuevo: pz[j].t }); i = j; }
+          else anotaciones.push({ tipo: 'borrar', p: pi, ini, fin: pos });
+          continue;
+        }
+        if (z.k === 'i') {
+          const prev = anotaciones[anotaciones.length - 1];
+          if (prev && prev.p === pi && prev.tipo === 'insertar' && prev.ini === pos) prev.nuevo += z.t;
+          else anotaciones.push({ tipo: 'insertar', p: pi, ini: pos, nuevo: z.t });
+        }
+      }
+      if (pos > base.length) { /* el Word trae texto de más: se recorta a la longitud del original */
+        anotaciones.forEach(a => { if (a.p === pi) { a.ini = Math.min(a.ini, base.length); if (a.fin !== undefined) a.fin = Math.min(a.fin, base.length); } });
+      }
+    }
+    // Sin control de cambios: comparar palabra por palabra
+    function delDiff(a, b, pi, wp) {
+      const ta = tokens(a), tb = tokens(b); const ops = lcs(ta.map(t => t.t), tb.map(t => t.t));
+      let i = 0, j = 0, k = 0;
+      while (k < ops.length) {
+        if (ops[k] === '=') { i++; j++; k++; continue; }
+        const ini = i < ta.length ? ta[i].ini : a.length; let fin = ini, nuevo = '';
+        while (k < ops.length && ops[k] !== '=') { if (ops[k] === '-') { fin = ta[i].fin; i++; } else { nuevo += tb[j].t; j++; } k++; }
+        if (fin > ini && nuevo) anotaciones.push({ tipo: 'reemplazar', p: pi, ini, fin, nuevo });
+        else if (fin > ini) anotaciones.push({ tipo: 'borrar', p: pi, ini, fin });
+        else if (nuevo) anotaciones.push({ tipo: 'insertar', p: pi, ini, nuevo });
+      }
+      // comentarios: se ubican buscando el texto comentado en el original
+      let pos = 0; const abiertos = {}; const fb = finalDe(wp);
+      wp.piezas.forEach(z => {
+        if (z.c !== undefined) { if (z.ab) abiertos[z.c] = pos; else { const frag = fb.slice(abiertos[z.c] ?? pos, pos); const at = frag ? a.indexOf(frag) : -1; const ini = at > -1 ? at : Math.min(abiertos[z.c] ?? 0, a.length); agregarComentario(pi, ini, at > -1 ? at + frag.length : ini, comentarios[z.c] || ''); } return; }
+        if (z.k === 'n' || z.k === 'i') pos += z.t.length;
+      });
+    }
+    function agregarComentario(pi, ini, fin, texto) {
+      if (!texto) return;
+      const igual = anotaciones.find(a => a.p === pi && a.tipo !== 'insertar' && a.ini === ini && a.fin === fin && !a.comentario);
+      if (igual) { igual.comentario = texto; return; }
+      if (fin > ini) anotaciones.push({ tipo: 'comentario', p: pi, ini, fin, comentario: texto });
+      else anotaciones.push({ tipo: 'insertar', p: pi, ini, nuevo: '', comentario: texto });
+    }
+    const resumen = { cambios: anotaciones.filter(a => a.tipo !== 'comentario' && !(a.tipo === 'insertar' && !a.nuevo)).length, comentarios: anotaciones.filter(a => a.comentario).length, controlDeCambios: hayCambios };
+    return { anotaciones, resumen };
+  }
+  const tokens = t => { const r = []; const re = /\s+|[^\s]+/g; let m; while ((m = re.exec(t))) r.push({ t: m[0], ini: m.index, fin: m.index + m[0].length }); return r; };
+  function lcs(a, b) {
+    const n = a.length, m = b.length; if (n * m > 4e6) return [...a.map(() => '-'), ...b.map(() => '+')];
+    const d = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) d[i][j] = a[i] === b[j] ? d[i + 1][j + 1] + 1 : Math.max(d[i + 1][j], d[i][j + 1]);
+    const ops = []; let i = 0, j = 0;
+    while (i < n && j < m) { if (a[i] === b[j]) { ops.push('='); i++; j++; } else if (d[i + 1][j] >= d[i][j + 1]) { ops.push('-'); i++; } else { ops.push('+'); j++; } }
+    while (i < n) { ops.push('-'); i++; } while (j < m) { ops.push('+'); j++; }
+    return ops;
+  }
+  // Empareja párrafos por parecido (para que un párrafo agregado o quitado no descuadre el resto)
+  function emparejar(a, b) {
+    const sim = (x, y) => { if (x === y) return 1; if (!x || !y) return x === y ? 1 : 0; const wx = new Set(x.split(' ')), wy = y.split(' '); let c = 0; wy.forEach(w => { if (wx.has(w)) c++; }); return (2 * c) / (wx.size + wy.length); };
+    const n = a.length, m = b.length; const S = Array.from({ length: n + 1 }, () => new Float32Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) { const s = sim(a[i], b[j]); S[i][j] = Math.max(S[i + 1][j], S[i][j + 1], s >= 0.5 ? S[i + 1][j + 1] + s : -1); }
+    const r = []; let i = 0, j = 0;
+    while (i < n && j < m) { const s = sim(a[i], b[j]); if (s >= 0.5 && Math.abs(S[i][j] - (S[i + 1][j + 1] + s)) < 1e-6) { r.push([i, j]); i++; j++; } else if (S[i + 1][j] >= S[i][j + 1]) { r.push([i, null]); i++; } else { r.push([null, j]); j++; } }
+    while (i < n) r.push([i++, null]); while (j < m) r.push([null, j++]);
+    return r;
+  }
+
   const desdeTexto = (texto, titulo = '') => crearCorregido({ parrafos: String(texto).split(/\r?\n/).map(l => ({ runs: l ? [{ t: l, b: false, i: false }] : [], texto: l })), titulo });
 
-  const api = { _bloques: bloques, _textoDe: textoDe, leerZip, escribirZip, leerParrafos, crearCorregido, llenarRubrica, aBase64, deBase64, desdeTexto };
+  const api = { _bloques: bloques, _textoDe: textoDe, leerZip, escribirZip, leerParrafos, leerCorrecciones, crearCorregido, llenarRubrica, aBase64, deBase64, desdeTexto };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else raiz.Docx = api;
 })(typeof window !== 'undefined' ? window : globalThis);
